@@ -18,7 +18,7 @@ import (
 //
 // If any of these conditions is not met, Rest will respond with an appropriate
 // HTTP error code and error message. Otherwise it will pass control down the line.
-func Rest(ctx context.Context, w http.ResponseWriter, r *http.Request) context.Context {
+func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) context.Context {
 
 	w.Header().Set("Accept", "application/json")
 	w.Header().Set("Accept-Charset", "UTF-8")
