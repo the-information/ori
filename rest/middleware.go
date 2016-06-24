@@ -24,9 +24,7 @@ func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) con
 	w.Header().Set("Accept-Charset", "UTF-8")
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	var conf = struct {
-		ValidOriginSuffix string
-	}{}
+	var conf config.Global
 
 	if err := config.Get(ctx, &conf); err != nil {
 		panic("Could not retrieve Configuration for Rest middleware: " + err.Error())
