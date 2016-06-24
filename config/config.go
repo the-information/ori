@@ -58,7 +58,7 @@ import (
 )
 
 var configContextKey = "__config_ctx"
-var ErrNotInConfigContext = errors.New("That context was not run through the api/config middleware")
+var ErrNotInConfigContext = errors.New("That context was not run through the ori/config middleware")
 var ErrConflict = errors.New("There was a conflict between versions of the object being saved")
 
 // ConfigEntity is the string name for the Entity used to store the configuration

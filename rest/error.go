@@ -6,7 +6,7 @@ import (
 
 // Error represents an application error that includes
 // both an HTTP status code and a message. An Error can
-// be passed to api.WriteJSON, which will appropriately
+// be passed to WriteJSON, which will appropriately
 // set the status code and write the error as a JSON
 // object. It implements the error interface.
 type Error struct {
