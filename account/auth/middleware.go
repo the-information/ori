@@ -15,15 +15,11 @@ import (
 
 var authKey = "__auth_ctx"
 
-type accountConfig struct {
-	AuthSecret string
-}
-
 // Middleware sets up the request context so account information can be
 // retrieved with auth.GetAccount(ctx). It panics if config.Get(ctx) fails.
 func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) context.Context {
 
-	var conf accountConfig
+	var conf config.Global
 	if err := config.Get(ctx, &conf); err != nil {
 		panic("Could not get AuthSecret: " + err.Error())
 	}
