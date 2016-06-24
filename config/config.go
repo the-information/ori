@@ -109,13 +109,18 @@ func Get(ctx context.Context, conf interface{}) error {
 func Save(ctx context.Context, conf interface{}) error {
 
 	existingConf := reflect.New(reflect.TypeOf(conf).Elem())
-	newConf := reflect.ValueOf(conf)
+
+	if err := Get(ctx, existingConf.Interface()); err != nil {
+		return err
+	}
 
 	return nds.RunInTransaction(ctx, func(txCtx context.Context) error {
 
+		dbConf := reflect.New(reflect.TypeOf(conf).Elem())
 		key := datastore.NewKey(txCtx, ConfigEntity, ConfigEntity, 0, nil)
-		err := nds.Get(txCtx, key, existingConf.Interface())
-		configTheSame := reflect.DeepEqual(existingConf, newConf)
+		err := nds.Get(txCtx, key, dbConf.Interface())
+
+		configTheSame := reflect.DeepEqual(existingConf.Interface(), dbConf.Interface())
 
 		if err == nil && !configTheSame {
 			return ErrConflict
