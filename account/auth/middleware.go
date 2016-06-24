@@ -5,12 +5,50 @@ import (
 	"encoding/json"
 	"github.com/guregu/kami"
 	"github.com/the-information/api2"
-	"github.com/the-information/api2/models"
+	"github.com/the-information/api2/account"
+	"github.com/the-information/api2/config"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/log"
 	"io/ioutil"
 	"net/http"
 )
+
+var authKey = "__auth_ctx"
+
+type accountConfig struct {
+	AuthSecret string
+}
+
+// Middleware sets up the request context so account information can be
+// retrieved with api.GetAuthorizedAccount(ctx). It panics if api.GetConfig(ctx) fails.
+func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) context.Context {
+
+	var conf accountConfig
+	if err := config.Get(ctx, &conf); err != nil {
+		panic("Could not get AuthSecret: " + err.Error())
+	}
+
+	claimSet, err := Decode([]byte(r.Header.Get("Authorization")), []byte(conf.AuthSecret))
+	if err != nil {
+		return context.WithValue(ctx, authKey, err)
+	} else if claimSet == SuperClaimSet {
+		return context.WithValue(ctx, authKey, &account.Super)
+	} else if claimSet == NobodyClaimSet {
+		return context.WithValue(ctx, authKey, &account.Nobody)
+	}
+
+	var acct account.Account
+	if err := account.Get(ctx, claimSet.Sub, &acct); err != nil {
+		api.WriteJSON(w, &api.Error{
+			Code:    http.StatusUnauthorized,
+			Message: "Could not retrieve account with key " + claimSet.Sub + ": " + err.Error(),
+		})
+		return nil
+	} else {
+		return context.WithValue(ctx, authKey, &acct)
+	}
+
+}
 
 var forbiddenMessage = "You do not have permission to access this resource."
 
@@ -26,8 +64,8 @@ type AuthCheck func(ctx context.Context, w http.ResponseWriter, r *http.Request)
 // identified by `Authorization: <secret>`).
 func Super(ctx context.Context, w http.ResponseWriter, r *http.Request) bool {
 
-	var acct models.Account
-	api.GetAuthorizedAccount(ctx, &acct)
+	var acct account.Account
+	GetAccount(ctx, &acct)
 	return acct.Super()
 
 }
@@ -37,8 +75,8 @@ func HasRole(role string) AuthCheck {
 
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request) bool {
 
-		var acct models.Account
-		api.GetAuthorizedAccount(ctx, &acct)
+		var acct account.Account
+		GetAccount(ctx, &acct)
 		return acct.HasRole(role)
 
 	}
@@ -52,9 +90,9 @@ func AccountMatchesParam(paramName string) AuthCheck {
 
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request) bool {
 
-		var acct models.Account
-		key, err := api.GetAuthorizedAccount(ctx, &acct)
-		return err == nil && key != nil && key.StringID() == kami.Param(ctx, paramName)
+		var acct account.Account
+		err := GetAccount(ctx, &acct)
+		return err == nil && acct.Key() == kami.Param(ctx, paramName)
 
 	}
 
@@ -73,8 +111,8 @@ func AccountOwnsObject(property string) AuthCheck {
 			return false
 		}
 
-		var acct models.Account
-		acctKey, err := api.GetAuthorizedAccount(ctx, &acct)
+		var acct account.Account
+		err := GetAccount(ctx, &acct)
 		if err != nil {
 			return false
 		} else if acct.Super() {
@@ -99,8 +137,7 @@ func AccountOwnsObject(property string) AuthCheck {
 			return false
 		}
 
-		return val.(string) == acctKey.StringID()
-
+		return val.(string) == acct.Key()
 	}
 
 }
@@ -130,7 +167,8 @@ func (c *Checker) Then(h kami.HandlerFunc) kami.HandlerFunc {
 
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 
-		accountId, _ := api.GetAuthorizedAccountID(ctx)
+		var acct account.Account
+		GetAccount(ctx, &acct)
 
 		// run the checks
 		passed := false
@@ -142,11 +180,11 @@ func (c *Checker) Then(h kami.HandlerFunc) kami.HandlerFunc {
 
 		// did one of them pass?
 		if passed {
-			log.Infof(ctx, "%s: access granted", accountId)
+			log.Infof(ctx, "%s: access granted", acct.Email)
 			h(ctx, w, r)
 		} else {
 
-			log.Warningf(ctx, "%s: access denied", accountId)
+			log.Warningf(ctx, "%s: access denied", acct.Email)
 			api.WriteJSON(w, &api.Error{
 				Code:    http.StatusForbidden,
 				Message: forbiddenMessage,
@@ -154,6 +192,24 @@ func (c *Checker) Then(h kami.HandlerFunc) kami.HandlerFunc {
 
 		}
 
+	}
+
+}
+
+// GetAccount retrieves the authorized account for ctx and copies it into account.
+// It returns the error if one was encountered.
+// Note that for special user types (account.Nobody and account.Super) both
+// the returned key and error will be nil.
+func GetAccount(ctx context.Context, acct *account.Account) error {
+
+	switch t := ctx.Value(authKey).(type) {
+	case error:
+		return t
+	case *account.Account:
+		*acct = *t
+		return nil
+	default:
+		panic("Type assertion failed, we should never get here")
 	}
 
 }

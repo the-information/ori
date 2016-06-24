@@ -1,4 +1,4 @@
-package api
+package rest
 
 import (
 	"encoding/json"
@@ -14,8 +14,8 @@ func ReadJSON(r *http.Request, dst interface{}) error {
 
 }
 
-// WriteJSON writes the JSON encoding of src to the response body.
-// It also sets the response's status code appropriately.
+// WriteJSON writes the JSON encoding
+// of src to the response body. It also sets the response's status code appropriately.
 //
 // As a special case, WriteJSON will automatically serialize error
 // objects as JSON objects with a single field "message" holding

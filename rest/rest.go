@@ -1,14 +1,13 @@
-package middleware
+package rest
 
 import (
 	"fmt"
-	"github.com/the-information/api2"
-	"github.com/the-information/api2/middleware/rest"
+	"github.com/the-information/api2/config"
 	"golang.org/x/net/context"
 	"net/http"
 )
 
-// The Rest middleware ensures all requests are formatted properly for a REST/JSON API.
+// Middleware ensures all requests are formatted properly for a REST/JSON API.
 // It requires that inbound requests meet all of the following conditions:
 //
 //	The request accepts application/json.
@@ -25,12 +24,15 @@ func Rest(ctx context.Context, w http.ResponseWriter, r *http.Request) context.C
 	w.Header().Set("Accept-Charset", "UTF-8")
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
-	var conf api.Config
-	if err := api.GetConfig(ctx, &conf); err != nil {
+	var conf = struct {
+		ValidOriginSuffix string
+	}{}
+
+	if err := config.Get(ctx, &conf); err != nil {
 		panic("Could not retrieve Configuration for Rest middleware: " + err.Error())
 	}
 
-	if !rest.AcceptsJson(r) || !rest.AcceptsUtf8(r) {
+	if !AcceptsJson(r) || !AcceptsUtf8(r) {
 
 		// If the requester does not accept JSON in the UTF-8	character set, respond with
 		// 406 Not Acceptable
@@ -39,7 +41,7 @@ func Rest(ctx context.Context, w http.ResponseWriter, r *http.Request) context.C
 		w.Write([]byte(`{"message": "This API only responds with application/json in UTF-8"}`))
 		return nil
 
-	} else if r.Method != "HEAD" && r.Method != "GET" && r.Method != "OPTIONS" && !rest.ContentIsJson(r) {
+	} else if r.Method != "HEAD" && r.Method != "GET" && r.Method != "OPTIONS" && !ContentIsJson(r) {
 
 		// If the requester has sent something other than application/json, respond with
 		// 415 Unsupported Media Type
@@ -48,7 +50,7 @@ func Rest(ctx context.Context, w http.ResponseWriter, r *http.Request) context.C
 		w.Write([]byte(`{"message": "This API only accepts application/json in UTF-8"}`))
 		return nil
 
-	} else if r.Header.Get("Origin") != "" && !rest.HasValidOrigin(r, conf.ValidOriginSuffix) {
+	} else if r.Header.Get("Origin") != "" && !HasValidOrigin(r, conf.ValidOriginSuffix) {
 
 		// If the requester has sent Origin and the origin is invalid, respond with
 		// 400 Bad Request
