@@ -23,7 +23,6 @@ func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) con
 	if err := config.Get(ctx, &conf); err != nil {
 		panic("Could not get AuthSecret: " + err.Error())
 	}
-
 	claimSet, err := Decode([]byte(r.Header.Get("Authorization")), []byte(conf.AuthSecret))
 	if err != nil {
 		return context.WithValue(ctx, authKey, err)
