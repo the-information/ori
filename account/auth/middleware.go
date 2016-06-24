@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/guregu/kami"
-	"github.com/the-information/api2"
-	"github.com/the-information/api2/account"
-	"github.com/the-information/api2/config"
+	"github.com/the-information/api/account"
+	"github.com/the-information/api/config"
+	"github.com/the-information/api/rest"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/log"
 	"io/ioutil"
@@ -20,7 +20,7 @@ type accountConfig struct {
 }
 
 // Middleware sets up the request context so account information can be
-// retrieved with api.GetAuthorizedAccount(ctx). It panics if api.GetConfig(ctx) fails.
+// retrieved with auth.GetAccount(ctx). It panics if config.Get(ctx) fails.
 func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) context.Context {
 
 	var conf accountConfig
@@ -39,7 +39,7 @@ func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) con
 
 	var acct account.Account
 	if err := account.Get(ctx, claimSet.Sub, &acct); err != nil {
-		api.WriteJSON(w, &api.Error{
+		rest.WriteJSON(w, &rest.Error{
 			Code:    http.StatusUnauthorized,
 			Message: "Could not retrieve account with key " + claimSet.Sub + ": " + err.Error(),
 		})
@@ -185,7 +185,7 @@ func (c *Checker) Then(h kami.HandlerFunc) kami.HandlerFunc {
 		} else {
 
 			log.Warningf(ctx, "%s: access denied", acct.Email)
-			api.WriteJSON(w, &api.Error{
+			rest.WriteJSON(w, &rest.Error{
 				Code:    http.StatusForbidden,
 				Message: forbiddenMessage,
 			})

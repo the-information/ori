@@ -2,7 +2,7 @@ package rest
 
 import (
 	"fmt"
-	"github.com/the-information/api2/config"
+	"github.com/the-information/api/config"
 	"golang.org/x/net/context"
 	"net/http"
 )
