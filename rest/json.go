@@ -30,15 +30,12 @@ func WriteJSON(w http.ResponseWriter, src interface{}) error {
 	enc := json.NewEncoder(w)
 
 	switch t := src.(type) {
-	case Error:
+	case Response:
 		w.WriteHeader(t.Code)
-		return enc.Encode(t)
-	case *Error:
-		w.WriteHeader(t.Code)
-		return enc.Encode(t)
+		return enc.Encode(t.Body)
 	case error:
 		w.WriteHeader(http.StatusInternalServerError)
-		return enc.Encode(&Error{Message: t.Error()})
+		return enc.Encode(&Message{t.Error()})
 	default:
 		w.WriteHeader(http.StatusOK)
 		return enc.Encode(t)

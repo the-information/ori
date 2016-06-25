@@ -40,7 +40,7 @@ func TestWriteJSON(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
-	WriteJSON(w, &ErrNotFound)
+	WriteJSON(w, ErrNotFound)
 	if w.Code != http.StatusNotFound {
 		t.Errorf("Got unexpected response code, wanted 404, got %d", w.Code)
 	} else if strings.TrimSpace(w.Body.String()) != `{"message":"The requested resource could not be located."}` {
