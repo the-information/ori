@@ -34,9 +34,9 @@ func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) con
 
 	var acct account.Account
 	if err := account.Get(ctx, claimSet.Sub, &acct); err != nil {
-		rest.WriteJSON(w, &rest.Error{
-			Code:    http.StatusUnauthorized,
-			Message: "Could not retrieve account with key " + claimSet.Sub + ": " + err.Error(),
+		rest.WriteJSON(w, &rest.Response{
+			Code: http.StatusUnauthorized,
+			Body: &rest.Message{"Could not retrieve account with key " + claimSet.Sub + ": " + err.Error()},
 		})
 		return nil
 	} else {
@@ -180,9 +180,9 @@ func (c *Checker) Then(h kami.HandlerFunc) kami.HandlerFunc {
 		} else {
 
 			log.Warningf(ctx, "%s: access denied", acct.Email)
-			rest.WriteJSON(w, &rest.Error{
-				Code:    http.StatusForbidden,
-				Message: forbiddenMessage,
+			rest.WriteJSON(w, &rest.Response{
+				Code: http.StatusForbidden,
+				Body: &rest.Message{forbiddenMessage},
 			})
 
 		}
