@@ -132,7 +132,7 @@ func (a *Account) SetPassword(plaintextPassword string) (err error) {
 
 // New creates and returns a new blank account. It returns an error if an account
 // with the specified email address already exists.
-func New(ctx context.Context, email, password string) (*Account, string, error) {
+func New(ctx context.Context, email, password string) (*Account, error) {
 
 	accountKey := fnv1a128([]byte(email))
 
@@ -140,7 +140,7 @@ func New(ctx context.Context, email, password string) (*Account, string, error) 
 	account.Email = email
 	account.CreatedAt = time.Now()
 	if err := account.SetPassword(password); err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	err := nds.RunInTransaction(ctx, func(txCtx context.Context) error {
@@ -158,11 +158,11 @@ func New(ctx context.Context, email, password string) (*Account, string, error) 
 	}, nil)
 
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
 
 	account.flag = camethroughus
-	return account, accountKey, nil
+	return account, nil
 
 }
 
