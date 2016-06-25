@@ -115,13 +115,13 @@ func TestSetPassword(t *testing.T) {
 
 func TestNew(t *testing.T) {
 
-	acct, id, err := New(ctx, "foo@bar.com", "foobar")
+	acct, err := New(ctx, "foo@bar.com", "foobar")
 	if err != nil {
 		t.Errorf("Got unexpected error %s creating new account", err)
 	}
 
-	if id != fnv1a128([]byte("foo@bar.com")) {
-		t.Errorf("Expected new account's ID to be %s, but it was %s", fnv1a128([]byte("foo@bar.com")), id)
+	if acct.Key() != fnv1a128([]byte("foo@bar.com")) {
+		t.Errorf("Expected new account's key to be %s, but it was %s", fnv1a128([]byte("foo@bar.com")), acct.Key())
 	}
 
 	if acct.Email != "foo@bar.com" {
@@ -133,7 +133,7 @@ func TestNew(t *testing.T) {
 	}
 
 	// now try to create the account again; should get error
-	acct, id, err = New(ctx, "foo@bar.com", "foobar")
+	acct, err = New(ctx, "foo@bar.com", "foobar")
 	if err != ErrAccountExists {
 		t.Errorf("Should have gotten ErrAccountExists trying to create an existing account, but got %s", err)
 	}
