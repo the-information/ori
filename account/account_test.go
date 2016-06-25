@@ -113,8 +113,9 @@ func TestSetPassword(t *testing.T) {
 
 }
 
-func TestNew(t *testing.T) {
+func TestNewAndGet(t *testing.T) {
 
+	// New
 	acct, err := New(ctx, "foo@bar.com", "foobar")
 	if err != nil {
 		t.Errorf("Got unexpected error %s creating new account", err)
@@ -138,21 +139,23 @@ func TestNew(t *testing.T) {
 		t.Errorf("Should have gotten ErrAccountExists trying to create an existing account, but got %s", err)
 	}
 
+	// Get
+	var acct2 Account
+
+	if err := Get(ctx, "foo@bar.com", &acct2); err != nil {
+		t.Errorf("Expected to get account for foo@bar.com, but got error %s", err)
+	}
+	if acct2.Email != "foo@bar.com" {
+		t.Errorf("Expected account to have email foo@bar.com, but got %s", acct2.Email)
+	}
+
+	if err := Get(ctx, "baz@bar.com", &acct2); err != datastore.ErrNoSuchEntity {
+		t.Errorf("Expected to get ErrNoSuchEntity for account baz@bar.com, but got %s", err)
+	}
+
 }
 
 func TestGet(t *testing.T) {
-
-	var acct Account
-	if err := Get(ctx, "foo@bar.com", &acct); err != nil {
-		t.Errorf("Expected to get account for foo@bar.com, but got error %s", err)
-	}
-	if acct.Email != "foo@bar.com" {
-		t.Errorf("Expected account to have email foo@bar.com, but got %s", acct.Email)
-	}
-
-	if err := Get(ctx, "baz@bar.com", &acct); err != datastore.ErrNoSuchEntity {
-		t.Errorf("Expected to get ErrNoSuchEntity for account foo@bar.com, but got %s", err)
-	}
 
 }
 
