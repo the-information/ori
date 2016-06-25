@@ -14,7 +14,7 @@ type Response struct {
 	Body interface{}
 }
 
-// CreatedResponse wraps a response object with http.StatusCreated.
+// CreatedResponse wraps a response object with http.StatusCreated for convenience.
 func CreatedResponse(src interface{}) Response {
 	return Response{http.StatusCreated, src}
 }
@@ -26,7 +26,6 @@ type Message struct {
 }
 
 var (
-	// ErrNotFound is used
 	ErrNotFound = Response{
 		http.StatusNotFound,
 		&Message{"The requested resource could not be located."},
@@ -34,5 +33,9 @@ var (
 	ErrConflict = Response{
 		http.StatusConflict,
 		&Message{"The requested operation conflicts with the existing state of that resource."},
+	}
+	ErrMethodNotAllowed = Response{
+		http.StatusMethodNotAllowed,
+		&Message{"That HTTP verb is not permitted at this endpoint."},
 	}
 )

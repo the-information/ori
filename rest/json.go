@@ -33,6 +33,9 @@ func WriteJSON(w http.ResponseWriter, src interface{}) error {
 	case Response:
 		w.WriteHeader(t.Code)
 		return enc.Encode(t.Body)
+	case *Response:
+		w.WriteHeader(t.Code)
+		return enc.Encode(t.Body)
 	case error:
 		w.WriteHeader(http.StatusInternalServerError)
 		return enc.Encode(&Message{t.Error()})
