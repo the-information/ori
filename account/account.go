@@ -194,15 +194,13 @@ func ChangeEmail(ctx context.Context, oldEmail, newEmail string) error {
 		toAccountKey := datastore.NewKey(txCtx, Entity, fnv1a128([]byte(newEmail)), 0, nil)
 
 		var s sync.WaitGroup
-
+		s.Add(2)
 		go func() {
-			s.Add(1)
 			errFrom = nds.Get(txCtx, fromAccountKey, &fromAccount)
 			s.Done()
 		}()
 
 		go func() {
-			s.Add(1)
 			errTo = nds.Get(txCtx, toAccountKey, &toAccount)
 			s.Done()
 		}()
@@ -218,16 +216,16 @@ func ChangeEmail(ctx context.Context, oldEmail, newEmail string) error {
 		// at this point, we set FromAccount's email address to the new one
 		fromAccount.Email = newEmail
 
+		s.Add(2)
+
 		go func() {
 			// delete the account at the old key
-			s.Add(1)
 			errFrom = nds.Delete(txCtx, fromAccountKey)
 			s.Done()
 		}()
 
 		go func() {
 			// save the account at the new key
-			s.Add(1)
 			_, errTo = nds.Put(txCtx, toAccountKey, &fromAccount)
 			s.Done()
 		}()
