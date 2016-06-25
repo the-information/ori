@@ -8,8 +8,7 @@ Write massively scalable, low-latency REST/JSON APIs in Go for App Engine, and h
 
 [Google App Engine](https://cloud.google.com/appengine/docs/go/) is a treasure trove of scalable,
 high-performance computing that costs very little money.
-It just has a couple of minor inconveniences that tend to befuddle people interested in setting up a 5-
-minute API:
+It just has a couple of minor inconveniences that tend to befuddle people interested in setting up a 5-minute API:
 
 - No environment variables for app configuration, such as third-party API secrets and the like.
 - A very weird and hard-to-use account system.
@@ -24,7 +23,7 @@ Read the documentation on [GoDoc](https://godoc.org/github.com/the-information/o
 
 ## getting started
 
-If you need a guided tutorial, [we have one.](https://github.com/the-information/ori/blob/master/tutorial/01-getting-started.md).
+If you need a guided tutorial, [we have one.](https://github.com/the-information/ori/blob/master/tutorial/01-getting-started.md)
 
 ## why's it called ori?
 

@@ -95,9 +95,10 @@ func init() {
 	// will take over from here.
 	http.Handle("/", kami.Handler())
 
-}```
+}
+```
 
-We can now run this server with the command `goapp serve .`:
+We can now run this server with the command `goapp get && goapp serve .`:
 
 ```bash
 $ goapp serve .
