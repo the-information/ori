@@ -1,5 +1,6 @@
 # ori
 [![GoDoc](https://godoc.org/github.com/the-information/ori?status.svg)](https://godoc.org/github.com/the-information/ori)
+[![CircleCI](https://circleci.com/gh/the-information/ori.svg?style=svg)](https://circleci.com/gh/the-information/ori)
 
 Write massively scalable, low-latency REST/JSON APIs in Go for App Engine, and have fun doing it.
 
