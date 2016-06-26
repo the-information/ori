@@ -176,6 +176,8 @@ func (c *Checker) Then(h kami.HandlerFunc) kami.HandlerFunc {
 		// did one of them pass?
 		if passed {
 			log.Infof(ctx, "%s: access granted", acct.Email)
+			// mark this as a context which passed authentication
+			ctx = context.WithValue(ctx, "__auth_check_ctx", "passed")
 			h(ctx, w, r)
 		} else {
 
