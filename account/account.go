@@ -13,6 +13,10 @@ import (
 
 var authKey string = "__auth_ctx"
 
+var xgTransaction = &datastore.TransactionOptions{
+	XG: true,
+}
+
 // Entity is the name of the Datastore entity used to store API accounts.
 var Entity = "APIAccount"
 
@@ -145,7 +149,7 @@ func New(ctx context.Context, email, password string) (*Account, error) {
 
 	err := nds.RunInTransaction(ctx, func(txCtx context.Context) error {
 
-		dsKey := datastore.NewKey(txCtx, Entity, fnv1a128([]byte(accountKey)), 0, nil)
+		dsKey := datastore.NewKey(txCtx, Entity, accountKey, 0, nil)
 		if err := nds.Get(txCtx, dsKey, account); err == nil {
 			return ErrAccountExists
 		} else if err != datastore.ErrNoSuchEntity {
@@ -240,7 +244,7 @@ func ChangeEmail(ctx context.Context, oldEmail, newEmail string) error {
 
 		return nil
 
-	}, nil)
+	}, xgTransaction)
 
 }
 
@@ -278,10 +282,39 @@ func HasChanged(ctx context.Context, account *Account) (bool, error) {
 
 	var currentState Account
 	key := datastore.NewKey(ctx, Entity, account.Key(), 0, nil)
-	if err := nds.Get(ctx, key, currentState); err != nil {
+	if err := nds.Get(ctx, key, &currentState); err != nil {
 		return false, err
 	} else {
 		return reflect.DeepEqual(*account, currentState), nil
 	}
+
+}
+
+// Remove safely deletes an account and all its associated information in the datastore. This includes
+// any objects that are descendants of the Account (i.e., a cascading delete).
+func Remove(ctx context.Context, account *Account) error {
+
+	return datastore.RunInTransaction(ctx, func(txCtx context.Context) error {
+
+		acctKey := datastore.NewKey(txCtx, Entity, account.Key(), 0, nil)
+		q := datastore.NewQuery("").
+			Ancestor(acctKey).
+			KeysOnly()
+
+		if changed, err := HasChanged(txCtx, account); err != nil {
+			return err
+		} else if changed {
+			return ErrConflict
+		}
+
+		keys, err := q.GetAll(txCtx, nil)
+		if err != nil {
+			return err
+		}
+
+		keys = append(keys, acctKey)
+		return nds.DeleteMulti(txCtx, keys)
+
+	}, nil)
 
 }

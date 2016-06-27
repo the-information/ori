@@ -1,7 +1,9 @@
 package account
 
 import (
+	"github.com/qedus/nds"
 	"golang.org/x/net/context"
+	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
 	"google.golang.org/appengine/datastore"
 	"os"
@@ -141,7 +143,6 @@ func TestNewAndGet(t *testing.T) {
 
 	// Get
 	var acct2 Account
-
 	if err := Get(ctx, "foo@bar.com", &acct2); err != nil {
 		t.Errorf("Expected to get account for foo@bar.com, but got error %s", err)
 	}
@@ -152,10 +153,6 @@ func TestNewAndGet(t *testing.T) {
 	if err := Get(ctx, "baz@bar.com", &acct2); err != datastore.ErrNoSuchEntity {
 		t.Errorf("Expected to get ErrNoSuchEntity for account baz@bar.com, but got %s", err)
 	}
-
-}
-
-func TestGet(t *testing.T) {
 
 }
 
@@ -193,6 +190,54 @@ func TestSave(t *testing.T) {
 	Get(ctx, "foo@bar.com", &acct)
 	if err := Save(ctx, &acct); err != nil {
 		t.Errorf("Expected no error when saving an account that came through us, but got %s", err)
+	}
+
+}
+
+type widget struct {
+	Cost float64
+}
+
+func TestRemove(t *testing.T) {
+
+	var acct Account
+	var widgetSet = []widget{{Cost: 1.0}, {Cost: 2.0}, {Cost: 3.0}}
+
+	if err := Get(ctx, "foo@bar.com", &acct); err != nil {
+		t.Fatalf("Unexpected error %s on get", err)
+	}
+
+	k := datastore.NewKey(ctx, Entity, acct.Key(), 0, nil)
+
+	k1 := datastore.NewKey(ctx, "Widget", "", 1, k)
+	k2 := datastore.NewKey(ctx, "Widget", "", 2, k)
+	k3 := datastore.NewKey(ctx, "Widget", "", 3, k)
+
+	if _, err := nds.PutMulti(ctx, []*datastore.Key{k1, k2, k3}, widgetSet); err != nil {
+		t.Fatalf("Unexpected error %s on PutMulti", err)
+	}
+
+	nds.GetMulti(ctx, []*datastore.Key{k1, k2, k3}, widgetSet)
+
+	if err := Remove(ctx, &acct); err != nil {
+		t.Fatalf("Unexpected error %s on Remove", err)
+	}
+
+	multiErr := nds.GetMulti(ctx, []*datastore.Key{k1, k2, k3}, widgetSet)
+	switch ty := multiErr.(type) {
+	default:
+		t.Fatalf("Unexpected error %s on GetMulti after Remove", ty)
+	case appengine.MultiError:
+		for _, err := range ty {
+			if err != datastore.ErrNoSuchEntity {
+				t.Fatalf("Unexpected error %s on GetMulti after Remove", err)
+			}
+		}
+	}
+
+	var acct2 Account
+	if err := Get(ctx, "foo@bar.com", &acct2); err == nil {
+		t.Fatalf("Unexpected error %s on account.Get after Remove %+v", err, acct2)
 	}
 
 }
