@@ -80,8 +80,8 @@ func TestKey(t *testing.T) {
 		Email: "foo@bar.com",
 	}
 
-	if account.Key() != "jb9LI_mVEZjAFRHvpQo_CQ" {
-		t.Errorf("Got unexpected account key %s", account.Key())
+	if account.Key(ctx).StringID() != "foo@bar.com" {
+		t.Errorf("Got unexpected account key %s", account.Key(ctx))
 	}
 
 }
@@ -123,8 +123,8 @@ func TestNewAndGet(t *testing.T) {
 		t.Errorf("Got unexpected error %s creating new account", err)
 	}
 
-	if acct.Key() != fnv1a128([]byte("foo@bar.com")) {
-		t.Errorf("Expected new account's key to be %s, but it was %s", fnv1a128([]byte("foo@bar.com")), acct.Key())
+	if acct.Key(ctx).StringID() != "foo@bar.com" {
+		t.Errorf("Expected new account's key to be %s, but it was %s", "foo@bar.com", acct.Key(ctx))
 	}
 
 	if acct.Email != "foo@bar.com" {
@@ -207,11 +207,9 @@ func TestRemove(t *testing.T) {
 		t.Fatalf("Unexpected error %s on get", err)
 	}
 
-	k := datastore.NewKey(ctx, Entity, acct.Key(), 0, nil)
-
-	k1 := datastore.NewKey(ctx, "Widget", "", 1, k)
-	k2 := datastore.NewKey(ctx, "Widget", "", 2, k)
-	k3 := datastore.NewKey(ctx, "Widget", "", 3, k)
+	k1 := datastore.NewKey(ctx, "Widget", "", 1, acct.Key(ctx))
+	k2 := datastore.NewKey(ctx, "Widget", "", 2, acct.Key(ctx))
+	k3 := datastore.NewKey(ctx, "Widget", "", 3, acct.Key(ctx))
 
 	if _, err := nds.PutMulti(ctx, []*datastore.Key{k1, k2, k3}, widgetSet); err != nil {
 		t.Fatalf("Unexpected error %s on PutMulti", err)

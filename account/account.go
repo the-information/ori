@@ -53,6 +53,10 @@ type Account struct {
 	// Do not read or modify this variable yourself; use
 	// CheckPassword and SetPassword instead.
 	SecurePassword []byte `json:"-" datastore:",noindex"`
+
+	// We keep this to check to see if somebody's tried to mutate the
+	// Email field between saves.
+	originalEmail string
 }
 
 const (
@@ -104,15 +108,14 @@ func (a *Account) Nobody() bool {
 	return a.flag == nobody
 }
 
-// Key returns the account's key, which is the FNV-1a 128-bit hash
-// of the email address.
-func (a *Account) Key() string {
+// Key returns the account's datastore key.
+func (a *Account) Key(ctx context.Context) *datastore.Key {
 
-	if a.Email == "" {
-		return ""
+	if a.Email == "" || a.Nobody() || a.Super() {
+		return nil
+	} else {
+		return datastore.NewKey(ctx, Entity, a.Email, 0, nil)
 	}
-
-	return fnv1a128([]byte(a.Email))
 
 }
 
@@ -138,8 +141,6 @@ func (a *Account) SetPassword(plaintextPassword string) (err error) {
 // with the specified email address already exists.
 func New(ctx context.Context, email, password string) (*Account, error) {
 
-	accountKey := fnv1a128([]byte(email))
-
 	account := new(Account)
 	account.Email = email
 	account.CreatedAt = time.Now()
@@ -149,7 +150,7 @@ func New(ctx context.Context, email, password string) (*Account, error) {
 
 	err := nds.RunInTransaction(ctx, func(txCtx context.Context) error {
 
-		dsKey := datastore.NewKey(txCtx, Entity, accountKey, 0, nil)
+		dsKey := account.Key(txCtx)
 		if err := nds.Get(txCtx, dsKey, account); err == nil {
 			return ErrAccountExists
 		} else if err != datastore.ErrNoSuchEntity {
@@ -166,20 +167,20 @@ func New(ctx context.Context, email, password string) (*Account, error) {
 	}
 
 	account.flag = camethroughus
+	account.originalEmail = email
 	return account, nil
 
 }
 
-// Get retrieves the account identified by email and stores it in
+// ByEmail retrieves the account identified by email and stores it in
 // the value pointed to by account.
 func Get(ctx context.Context, email string, account *Account) error {
 
-	dsKey := datastore.NewKey(ctx, Entity, fnv1a128([]byte(email)), 0, nil)
-
-	if err := nds.Get(ctx, dsKey, account); err != nil {
+	if err := nds.Get(ctx, datastore.NewKey(ctx, Entity, email, 0, nil), account); err != nil {
 		return err
 	} else {
 		account.flag = camethroughus
+		account.originalEmail = account.Email
 		return nil
 	}
 
@@ -194,8 +195,8 @@ func ChangeEmail(ctx context.Context, oldEmail, newEmail string) error {
 		// read out both the account at the old and the new email addresses
 		var fromAccount, toAccount Account
 		var errFrom, errTo error
-		fromAccountKey := datastore.NewKey(txCtx, Entity, fnv1a128([]byte(oldEmail)), 0, nil)
-		toAccountKey := datastore.NewKey(txCtx, Entity, fnv1a128([]byte(newEmail)), 0, nil)
+		fromAccountKey := datastore.NewKey(txCtx, Entity, oldEmail, 0, nil)
+		toAccountKey := datastore.NewKey(txCtx, Entity, newEmail, 0, nil)
 
 		var s sync.WaitGroup
 		s.Add(2)
@@ -219,6 +220,7 @@ func ChangeEmail(ctx context.Context, oldEmail, newEmail string) error {
 
 		// at this point, we set FromAccount's email address to the new one
 		fromAccount.Email = newEmail
+		fromAccount.LastUpdatedAt = time.Now()
 
 		s.Add(2)
 
@@ -254,7 +256,7 @@ func ChangeEmail(ctx context.Context, oldEmail, newEmail string) error {
 // account in the datastore has changed in the interim.
 func Save(ctx context.Context, account *Account) error {
 
-	if account.flag != camethroughus {
+	if account.flag != camethroughus || account.Email != account.originalEmail {
 		return ErrUnsaveableAccount
 	}
 
@@ -267,8 +269,7 @@ func Save(ctx context.Context, account *Account) error {
 		}
 
 		account.LastUpdatedAt = time.Now()
-		dsKey := datastore.NewKey(ctx, Entity, account.Key(), 0, nil)
-		_, err := nds.Put(ctx, dsKey, account)
+		_, err := nds.Put(ctx, account.Key(ctx), account)
 		return err
 
 	}, nil)
@@ -281,7 +282,7 @@ func Save(ctx context.Context, account *Account) error {
 func HasChanged(ctx context.Context, account *Account) (bool, error) {
 
 	var currentState Account
-	key := datastore.NewKey(ctx, Entity, account.Key(), 0, nil)
+	key := account.Key(ctx)
 	if err := nds.Get(ctx, key, &currentState); err != nil {
 		return false, err
 	} else {
@@ -296,7 +297,7 @@ func Remove(ctx context.Context, account *Account) error {
 
 	return datastore.RunInTransaction(ctx, func(txCtx context.Context) error {
 
-		acctKey := datastore.NewKey(txCtx, Entity, account.Key(), 0, nil)
+		acctKey := account.Key(txCtx)
 		q := datastore.NewQuery("").
 			Ancestor(acctKey).
 			KeysOnly()

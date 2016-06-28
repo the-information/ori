@@ -87,7 +87,7 @@ func AccountMatchesParam(paramName string) AuthCheck {
 
 		var acct account.Account
 		err := GetAccount(ctx, &acct)
-		return err == nil && acct.Key() == kami.Param(ctx, paramName)
+		return err == nil && acct.Key(ctx).Encode() == kami.Param(ctx, paramName)
 
 	}
 
@@ -95,9 +95,9 @@ func AccountMatchesParam(paramName string) AuthCheck {
 
 // AccountOwnsObject returns an AuthCheck that reads the request body and grants
 // access if the request body is an object that has the property `property` and its
-// value is the same as the account's ID. So, for instance, on a request with a body shaped
-// like `{"owner": "asdf"}`, AccountOwnsObject("owner") will return true if
-// the authorized account's ID is `asdf`.
+// value is the same as the account's encoded datastore key. So, for instance,
+// on a request with a body shaped like `{"owner": "asdf"}`, AccountOwnsObject("owner")
+// will return true if the authorized account's encoded datastore key is `asdf`.
 func AccountOwnsObject(property string) AuthCheck {
 
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request) bool {
@@ -132,7 +132,7 @@ func AccountOwnsObject(property string) AuthCheck {
 			return false
 		}
 
-		return val.(string) == acct.Key()
+		return val.(string) == acct.Key(ctx).Encode()
 	}
 
 }
