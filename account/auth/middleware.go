@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"github.com/guregu/kami"
 	"github.com/the-information/ori/account"
 	"github.com/the-information/ori/config"
@@ -14,6 +15,8 @@ import (
 )
 
 var authKey = "__auth_ctx"
+
+var ErrNotInAuthContext = errors.New("That context object was not run through auth.Middleware!")
 
 // Middleware sets up the request context so account information can be
 // retrieved with auth.GetAccount(ctx). It panics if config.Get(ctx) fails.
@@ -206,7 +209,7 @@ func GetAccount(ctx context.Context, acct *account.Account) error {
 		*acct = *t
 		return nil
 	default:
-		panic("Type assertion failed, we should never get here")
+		return ErrNotInAuthContext
 	}
 
 }
