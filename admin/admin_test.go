@@ -20,10 +20,12 @@ var ctx context.Context
 func TestMain(m *testing.M) {
 
 	c, done, _ := aetest.NewContext()
-	defer done()
 	ctx = c
 
-	os.Exit(m.Run())
+	result := m.Run()
+
+	done()
+	os.Exit(result)
 
 }
 
