@@ -2,6 +2,7 @@ package rest
 
 import (
 	"encoding/json"
+	"github.com/the-information/ori/errors"
 	"net/http"
 )
 
@@ -27,21 +28,42 @@ func ReadJSON(r *http.Request, dst interface{}) error {
 // status code 500.
 func WriteJSON(w http.ResponseWriter, src interface{}) error {
 
-	enc := json.NewEncoder(w)
-
 	switch t := src.(type) {
 	case Response:
-		w.WriteHeader(t.Code)
-		return enc.Encode(t.Body)
+		return writeResponse(w, &t)
 	case *Response:
-		w.WriteHeader(t.Code)
-		return enc.Encode(t.Body)
+		return writeResponse(w, t)
+	case *errors.Error:
+		return writeResponse(w, &Response{
+			Code: t.Code(),
+			Body: t,
+		})
 	case error:
-		w.WriteHeader(http.StatusInternalServerError)
-		return enc.Encode(&Message{t.Error()})
+		return writeResponse(w, &Response{
+			Code: http.StatusInternalServerError,
+			Body: &Message{t.Error()},
+		})
 	default:
-		w.WriteHeader(http.StatusOK)
-		return enc.Encode(t)
+		return writeResponse(w, &Response{
+			Code: http.StatusOK,
+			Body: t,
+		})
 	}
 
+}
+
+func writeResponse(w http.ResponseWriter, resp *Response) error {
+
+	enc := json.NewEncoder(w)
+
+	if resp.Code == 0 {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(resp.Code)
+	}
+	if resp.Body != nil {
+		return enc.Encode(resp.Body)
+	} else {
+		return nil
+	}
 }

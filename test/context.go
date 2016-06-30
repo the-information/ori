@@ -2,6 +2,7 @@
 package test
 
 import (
+	"github.com/the-information/ori/config"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
 )
@@ -21,17 +22,19 @@ func BlessContext(ctx context.Context, conf interface{}, authorizedAccount inter
 
 	case datastore.PropertyLoadSaver:
 		props, err = t.Save()
+		configObject := config.Config(props)
 		if err != nil {
 			return nil, err
 		}
-		ctx = context.WithValue(ctx, "__config_ctx", props)
+		ctx = context.WithValue(ctx, "__config_ctx", &configObject)
 
 	default:
 		props, err = datastore.SaveStruct(conf)
+		configObject := config.Config(props)
 		if err != nil {
 			return nil, err
 		}
-		ctx = context.WithValue(ctx, "__config_ctx", props)
+		ctx = context.WithValue(ctx, "__config_ctx", &configObject)
 	}
 
 	if err != nil {

@@ -1,8 +1,10 @@
 package config
 
 import (
+	"encoding/json"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/aetest"
+	"google.golang.org/appengine/datastore"
 	"testing"
 )
 
@@ -50,6 +52,93 @@ func TestSave(t *testing.T) {
 
 	if err := Save(ctx2, &fake3); err != nil {
 		t.Errorf("Expected no error while saving fake3 the second time, but got %s", err)
+	}
+
+}
+
+func TestMarshalJSON(t *testing.T) {
+
+	x := []datastore.Property{
+		{
+			Name:  "foo",
+			Value: "bar",
+		},
+		{
+			Name:  "baz",
+			Value: 7,
+		},
+		{
+			Name:  "quux",
+			Value: true,
+		},
+		{
+			Name:  "wat",
+			Value: nil,
+		},
+	}
+
+	y := Config(x)
+	data, err := json.Marshal(&y)
+	if err != nil {
+		t.Fatalf("Unexpected error %s", err)
+	}
+
+	result := map[string]interface{}{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("Unexpected error %s on unmarshal", err)
+	}
+	if len(result) != 4 {
+		t.Errorf("Unexpected # of results, wanted 4, got %d", len(result))
+	}
+
+	for k, v := range result {
+		switch k {
+		case "foo":
+			t.Logf("%s", v.(string))
+		case "baz":
+			t.Logf("%f", v.(float64))
+		case "quux":
+			t.Logf("%t", v.(bool))
+		case "wat":
+			t.Logf("%v", v)
+		default:
+			t.Fatalf("Unexpected key %s", k)
+		}
+	}
+
+}
+
+func TestUnmarshalJSON(t *testing.T) {
+
+	data := []byte(`{"foo": "bar", "baz": 7, "quux": true, "wat": null}`)
+	w := Config([]datastore.Property{{Name: "first", Value: "post"}})
+
+	if err := json.Unmarshal(data, &w); err != nil {
+		t.Fatalf("Unexpected error %s on Unmarshal", err)
+	}
+
+	if len(w) != 5 {
+		t.Fatalf("Unexpected number of properties, wanted 5, got %d", len(w))
+	}
+
+	for _, prop := range []datastore.Property(w) {
+		switch prop.Name {
+		case "first":
+			t.Logf("%v", prop.Value.(string))
+		case "foo":
+			t.Logf("%v", prop.Value.(string))
+		case "baz":
+			t.Logf("%v", prop.Value.(float64))
+		case "quux":
+			t.Logf("%v", prop.Value.(bool))
+		case "wat":
+			t.Logf("%v", prop.Value)
+			if prop.Value != nil {
+				t.Errorf("wat's value should have been nil, but got %v", prop.Value)
+			}
+		default:
+			t.Fatalf("Unexpected property %s", prop.Name)
+		}
 	}
 
 }

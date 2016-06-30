@@ -4,6 +4,7 @@ import (
 	// kami gives us URL routing by method and parameterized path,
 	// as well as a convenient way to write request handlers.
 	"github.com/guregu/kami"
+	"github.com/the-information/ori/admin"
 	// ori/config provides application-wide configuration.
 	"github.com/the-information/ori/config"
 	// ori/rest provides content negotiation and CORS support.
@@ -31,11 +32,15 @@ func init() {
 	// When a request comes up as 404 Not Found because of the router,
 	// send a JSON message explaining the problem.
 	kami.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		rest.WriteJSON(w, &rest.ErrNotFound)
+		rest.WriteJSON(w, &rest.Response{
+			Code: 404,
+			Body: &rest.Message{r.URL.String()},
+		})
 	})
 
 	// Install Kami as the default HTTP handler. App Engine
 	// will take over from here.
 	http.Handle("/", kami.Handler())
+	http.Handle("/_ori/", admin.NewHandler("/_ori/"))
 
 }

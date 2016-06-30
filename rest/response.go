@@ -7,6 +7,7 @@ import (
 // Response is a wrapper for REST/JSON responses that permits you to set the status code
 // and the response body all at once. Use it as follows:
 //	rest.WriteJSON(w, rest.Response{http.StatusNoContent, &myObject})
+// It implements Error, so you can pass it around as an error interface.
 type Response struct {
 	// Code is the http status code for the response.
 	Code int
@@ -26,6 +27,10 @@ type Message struct {
 }
 
 var (
+	NoContent = Response{
+		http.StatusNoContent,
+		nil,
+	}
 	ErrNotFound = Response{
 		http.StatusNotFound,
 		&Message{"The requested resource could not be located."},

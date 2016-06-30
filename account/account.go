@@ -1,11 +1,12 @@
 package account
 
 import (
-	"errors"
 	"github.com/qedus/nds"
+	"github.com/the-information/ori/errors"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
+	"net/http"
 	"reflect"
 	"sync"
 	"time"
@@ -20,10 +21,10 @@ var xgTransaction = &datastore.TransactionOptions{
 // Entity is the name of the Datastore entity used to store API accounts.
 var Entity = "APIAccount"
 
-var ErrConflict = errors.New("A competing change to the account has already been made")
-var ErrAccountExists = errors.New("An account with that email already exists")
-var ErrPasswordTooShort = errors.New("Password is too short")
-var ErrUnsaveableAccount = errors.New("This is a special account that cannot be saved")
+var ErrConflict = errors.New(http.StatusConflict, "A competing change to the account has already been made")
+var ErrAccountExists = errors.New(http.StatusConflict, "An account with that email already exists")
+var ErrPasswordTooShort = errors.New(http.StatusBadRequest, "Password is too short")
+var ErrUnsaveableAccount = errors.New(http.StatusBadRequest, "This is a special account that cannot be saved")
 
 // Account represents an account to access the API. It handles
 // all logic to do with authentication and password checking.
@@ -31,15 +32,15 @@ type Account struct {
 	flag int
 
 	// CreatedAt stores the time at which this account was originally created.
-	CreatedAt time.Time `json:"createdAt"`
+	CreatedAt time.Time `json:"createdAt,omitempty"`
 
 	// LastUpdatedAt represents the last time at which this account was modified.
-	LastUpdatedAt time.Time `json:"lastUpdatedAt"`
+	LastUpdatedAt time.Time `json:"lastUpdatedAt,omitempty"`
 
 	// Email is the email address associated with this account. It is also used
 	// to generate the key for the account, which is the 128-bit FNV-1a hash of
 	// the email address. Do not modify this value directly; instead, use ChangeEmail.
-	Email string `json:"email"`
+	Email string `json:"email,omitempty"`
 
 	// Roles is a list of semantic privileges the account may have
 	// access to. For instance, having a role of "admin" may entitle
@@ -47,7 +48,7 @@ type Account struct {
 	// a role of "event_manager" may allow a user permission to change
 	// a hypothetical "event" object. It is recommended to use Roles
 	// in conjunction with auth.Check.
-	Roles []string `json:"roles"`
+	Roles []string `json:"roles,omitempty"`
 
 	// SecurePassword is a bcrypt hash of the account's password.
 	// Do not read or modify this variable yourself; use
@@ -172,7 +173,7 @@ func New(ctx context.Context, email, password string) (*Account, error) {
 
 }
 
-// ByEmail retrieves the account identified by email and stores it in
+// Get retrieves the account identified by email and stores it in
 // the value pointed to by account.
 func Get(ctx context.Context, email string, account *Account) error {
 

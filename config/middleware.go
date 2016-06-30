@@ -15,11 +15,11 @@ import (
 //	kami.Use("/", config.Middleware)
 func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) context.Context {
 
-	if props, err := retrieve(ctx); err != nil && err != datastore.ErrNoSuchEntity {
+	if conf, err := retrieve(ctx); err != nil && err != datastore.ErrNoSuchEntity {
 		log.Errorf(ctx, "Could not retrieve config: %s", err)
 		return nil
 	} else {
-		return context.WithValue(ctx, configContextKey, props)
+		return context.WithValue(ctx, configContextKey, conf)
 	}
 
 }
