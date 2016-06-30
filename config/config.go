@@ -37,10 +37,14 @@ func (conf *Config) UnmarshalJSON(data []byte) error {
 
 	*conf = (*conf)[:0]
 	for k, v := range result {
-		*conf = append(*conf, datastore.Property{
-			Name:  k,
-			Value: v,
-		})
+
+		if v != nil {
+			*conf = append(*conf, datastore.Property{
+				Name:  k,
+				Value: v,
+			})
+		}
+
 	}
 
 	return nil

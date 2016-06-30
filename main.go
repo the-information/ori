@@ -56,29 +56,17 @@ func init() {
 			Usage: "Get or set a configuration variable on an application",
 			Subcommands: []cli.Command{
 				{
-					Name:   "get",
-					Usage:  "Get a configuration variable from the app",
-					Action: cmd.GetConfig,
-					Flags: []cli.Flag{
-						cli.BoolFlag{
-							Name:  "int",
-							Usage: "Treat the variable as an integer",
-						},
-						cli.BoolFlag{
-							Name:  "float",
-							Usage: "Treat the variable as a floating-point number",
-						},
-						cli.BoolFlag{
-							Name:  "bool",
-							Usage: "Treat the variable as a boolean value ('true' and 'false')",
-						},
-					},
+					Name:      "get",
+					Usage:     "Get a configuration variable from the app",
+					ArgsUsage: "[key]",
+					Action:    cmd.GetConfig,
 				},
 				{
-					Name:   "set",
-					Usage:  "Set an environment variable on the app. Use syntax NAME=VALUE",
-					Action: cmd.SetConfig,
-					Flags:  []cli.Flag{},
+					Name:      "set",
+					Usage:     "Set an environment variable on the app.",
+					ArgsUsage: "key value [key] [value] ...",
+					Action:    cmd.SetConfig,
+					Flags:     []cli.Flag{},
 				},
 			},
 		},
