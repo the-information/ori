@@ -184,6 +184,31 @@ func Test_changeAccount(t *testing.T) {
 
 }
 
+func Test_changeAccountPassword(t *testing.T) {
+
+	var acct account.Account
+
+	id := base64.RawURLEncoding.EncodeToString([]byte("moveto@bar.com"))
+
+	w := test.NewState().
+		Param("id", id).
+		Body("blargblargblarg").
+		Run(ctx, changeAccountPassword)
+
+	if w.Code != http.StatusNoContent {
+		t.Errorf("Expected status code http.StatusNoContent, got %d, error %s", w.Code, w.Body.String())
+	}
+
+	if err := account.Get(ctx, "moveto@bar.com", &acct); err != nil {
+		t.Errorf("Got unexpected error %s while reading account again after password change", err)
+	}
+
+	if err := acct.CheckPassword("blargblargblarg"); err != nil {
+		t.Errorf("acct.CheckPassword(blargblargblarg) should have had no error, but got: %s", err)
+	}
+
+}
+
 func Test_deleteAccount(t *testing.T) {
 
 	var acct account.Account

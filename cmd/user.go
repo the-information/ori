@@ -13,6 +13,10 @@ func RemoveUser(c *cli.Context) error {
 	return nil
 }
 
+func GetUser(c *cli.Context) error {
+	return nil
+}
+
 func ChangeUserEmail(c *cli.Context) error {
 	return nil
 }

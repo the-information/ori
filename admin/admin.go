@@ -33,6 +33,7 @@ func NewHandler(route string) *kami.Mux {
 	ori.Get(route+"accounts/:id", auth.Check(auth.Super).Then(getAccount))
 	ori.Delete(route+"accounts/:id", auth.Check(auth.Super).Then(deleteAccount))
 	ori.Patch(route+"accounts/:id", auth.Check(auth.Super).Then(changeAccount))
+	ori.Post(route+"accounts/:id/password", auth.Check(auth.Super).Then(changeAccountPassword))
 
 	return ori
 
@@ -151,7 +152,7 @@ func changeAccount(ctx context.Context, w http.ResponseWriter, r *http.Request) 
 
 		email = acct.Email
 
-		if account.Get(ctx, email, &acct); err != nil {
+		if err = account.Get(ctx, email, &acct); err != nil {
 			rest.WriteJSON(w, err)
 			return
 		}
@@ -171,5 +172,34 @@ func changeAccount(ctx context.Context, w http.ResponseWriter, r *http.Request) 
 	}
 
 	rest.WriteJSON(w, &resp)
+
+}
+
+func changeAccountPassword(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+
+	var acct account.Account
+
+	var email string
+	var newPassword string
+
+	// read the account ID
+	if emailBytes, err := base64.RawURLEncoding.DecodeString(rest.Param(ctx, "id")); err != nil {
+		rest.WriteJSON(w, err)
+		return
+	} else {
+		email = string(emailBytes)
+	}
+
+	if err := rest.ReadJSON(r, &newPassword); err != nil {
+		rest.WriteJSON(w, err)
+	} else if err := account.Get(ctx, email, &acct); err != nil {
+		rest.WriteJSON(w, err)
+	} else if err := acct.SetPassword(newPassword); err != nil {
+		rest.WriteJSON(w, err)
+	} else if err := account.Save(ctx, &acct); err != nil {
+		rest.WriteJSON(w, err)
+	} else {
+		rest.WriteJSON(w, &rest.NoContent)
+	}
 
 }
