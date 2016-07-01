@@ -57,7 +57,7 @@ func init() {
 			Subcommands: []cli.Command{
 				{
 					Name:      "get",
-					Usage:     "Get a configuration variable from the app",
+					Usage:     "Get a configuration variable from the app (or the whole config if no one variable is specified)",
 					ArgsUsage: "[key]",
 					Action:    cmd.GetConfig,
 				},
@@ -75,20 +75,58 @@ func init() {
 			Usage: "Modify accounts associated with the application",
 			Subcommands: []cli.Command{
 				{
-					Name:  "add",
-					Usage: "Add account",
+					Name:      "add",
+					Usage:     "Add account",
+					ArgsUsage: "email password",
+					Action:    cmd.AddAccount,
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:  "roles",
+							Usage: "Attach comma-separated `ROLES_LIST` to this new account",
+						},
+					},
 				},
 				{
-					Name:  "remove",
-					Usage: "Remove account",
+					Name:      "remove",
+					Usage:     "Remove account",
+					ArgsUsage: "email",
+					Action:    cmd.RemoveAccount,
 				},
 				{
-					Name:  "password",
-					Usage: "Change password on account",
+					Name:      "get",
+					Usage:     "Show account",
+					ArgsUsage: "email",
+					Action:    cmd.GetAccount,
 				},
 				{
-					Name:  "change-email",
-					Usage: "Change email address on account",
+					Name:  "roles",
+					Usage: "Actions related to user roles",
+					Subcommands: []cli.Command{
+						{
+							Name:      "add",
+							Usage:     "Add roles to account",
+							ArgsUsage: "role [role...]",
+							Action:    cmd.AddAccountRole,
+						},
+						{
+							Name:      "remove",
+							Usage:     "Remove roles from account",
+							ArgsUsage: "role [role...]",
+							Action:    cmd.RemoveAccountRole,
+						},
+					},
+				},
+				{
+					Name:      "password",
+					Usage:     "Change password on account",
+					ArgsUsage: "new_password",
+					Action:    cmd.ChangeAccountPassword,
+				},
+				{
+					Name:      "change-email",
+					Usage:     "Change email address on account",
+					ArgsUsage: "new_address",
+					Action:    cmd.ChangeAccountEmail,
 				},
 			},
 		},

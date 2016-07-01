@@ -10,46 +10,38 @@ import (
 )
 
 func get(c *cli.Context, path string, dst interface{}) error {
+	return do(c, "GET", path, nil, dst)
+}
 
-	mount := c.GlobalString("mount")
-	app := c.GlobalString("app")
-	secret := c.GlobalString("secret")
-
-	r, err := http.NewRequest("GET", app+mount+path, nil)
-	if err != nil {
-		return err
-	}
-
-	r.Header.Set("Accept", "application/json")
-	r.Header.Set("Content-Type", "application/json")
-	r.Header.Set("Authorization", secret)
-
-	resp, err := http.DefaultClient.Do(r)
-	if err != nil {
-		return err
-	}
-
-	data, err := readResponse(resp)
-	if err != nil {
-		return err
-	}
-
-	return json.Unmarshal(data, dst)
-
+func post(c *cli.Context, path string, src, dst interface{}) error {
+	return do(c, "POST", path, src, dst)
 }
 
 func patch(c *cli.Context, path string, src, dst interface{}) error {
+	return do(c, "PATCH", path, src, dst)
+}
 
-	mount := c.GlobalString("mount")
+func del(c *cli.Context, path string) error {
+	return do(c, "DELETE", path, nil, nil)
+}
+
+func do(c *cli.Context, method, path string, src interface{}, dst interface{}) error {
+
 	app := c.GlobalString("app")
+	mount := c.GlobalString("mount")
 	secret := c.GlobalString("secret")
 
-	body, err := json.Marshal(src)
-	if err != nil {
-		return err
+	body := bytes.NewBuffer(nil)
+
+	if src != nil {
+		jsonData, err := json.Marshal(src)
+		if err != nil {
+			return err
+		}
+		body = bytes.NewBuffer(jsonData)
 	}
 
-	r, err := http.NewRequest("PATCH", app+mount+path, bytes.NewBuffer(body))
+	r, err := http.NewRequest(method, app+mount+path, body)
 	if err != nil {
 		return err
 	}
@@ -61,14 +53,13 @@ func patch(c *cli.Context, path string, src, dst interface{}) error {
 	resp, err := http.DefaultClient.Do(r)
 	if err != nil {
 		return err
-	}
-
-	data, err := readResponse(resp)
-	if err != nil {
+	} else if data, err := readResponse(resp); err != nil {
 		return err
+	} else if dst == nil {
+		return nil
+	} else {
+		return json.Unmarshal(data, dst)
 	}
-
-	return json.Unmarshal(data, dst)
 
 }
 
@@ -81,7 +72,7 @@ func readResponse(resp *http.Response) ([]byte, error) {
 	}
 	resp.Body.Close()
 
-	if resp.StatusCode > 299 {
+	if resp.StatusCode > 399 {
 		x := struct {
 			Message string `json:"message"`
 		}{}
