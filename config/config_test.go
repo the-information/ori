@@ -110,15 +110,15 @@ func TestMarshalJSON(t *testing.T) {
 
 func TestUnmarshalJSON(t *testing.T) {
 
-	data := []byte(`{"foo": "bar", "baz": 7, "quux": true, "wat": null}`)
+	data := []byte(`{"foo": "bar", "baz": 7, "quux": true}`)
 	w := Config([]datastore.Property{{Name: "first", Value: "post"}})
 
 	if err := json.Unmarshal(data, &w); err != nil {
 		t.Fatalf("Unexpected error %s on Unmarshal", err)
 	}
 
-	if len(w) != 5 {
-		t.Fatalf("Unexpected number of properties, wanted 5, got %d", len(w))
+	if len(w) != 4 {
+		t.Fatalf("Unexpected number of properties, wanted 4, got %d -- %+v", len(w))
 	}
 
 	for _, prop := range []datastore.Property(w) {
