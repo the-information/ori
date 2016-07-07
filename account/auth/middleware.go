@@ -14,7 +14,9 @@ import (
 	"net/http"
 )
 
-var authKey = "__auth_ctx"
+var (
+	authKey = "__auth_ctx"
+)
 
 var ErrNotInAuthContext = errors.New("That context object was not run through auth.Middleware!")
 
@@ -143,18 +145,26 @@ func AccountOwnsObject(property string) AuthCheck {
 // Checker is an object returned by auth.Check.
 type Checker struct {
 	checks []AuthCheck
+	all    bool
 }
 
-// Check produces a Checker for a set of AuthChecks. If all of the AuthChecks
-// fail, Checker.Then will return a 403 to the user and prevent the underlying
+// Check produces a Checker for a set of AuthChecks. If none of the AuthChecks
+// pass, Checker.Then will return a 403 to the user and prevent the underlying
 // handler from being called.
 func Check(checks ...AuthCheck) *Checker {
 	return &Checker{checks: checks}
 }
 
+// CheckAll produces a Checker for a set of AuthChecks. If any of the AuthChecks
+// fail, Checker.Then will return a 403 to the user and prevent the underlying
+// handler from being called.
+func CheckAll(checks ...AuthCheck) *Checker {
+	return &Checker{checks: checks, all: true}
+}
+
 // Then produces a kami.Handler that wraps another handler with authentication magic.
 // If every AuthCheck associated with the Checker fails, Then will reject the HTTP request
-// with a 403. If even one of them passes, Then will call h.
+// with a 403. If only one of them passes, Then will call h.
 // This produces a very pleasant syntax for authenticating routes:
 // 	func listAccounts(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 //		w.Write([]byte("[]"))
@@ -173,6 +183,9 @@ func (c *Checker) Then(h kami.HandlerFunc) kami.HandlerFunc {
 		for _, check := range c.checks {
 			if check(ctx, w, r) {
 				passed = true
+			} else if c.all {
+				passed = false
+				break
 			}
 		}
 
