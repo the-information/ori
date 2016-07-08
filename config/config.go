@@ -4,19 +4,27 @@ import (
 	"encoding/json"
 	"github.com/qedus/nds"
 	"github.com/the-information/ori/errors"
+	"github.com/the-information/ori/internal"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
 	"net/http"
 	"reflect"
 )
 
-var configContextKey = "__config_ctx"
 var ErrNotInConfigContext = errors.New(http.StatusInternalServerError, "That context was not run through the ori/config middleware")
 var ErrConflict = errors.New(http.StatusConflict, "There was a conflict between versions of the object being saved")
 
 // Entity is the string name for the Entity used to store the configuration
 // in the App Engine Datastore. Think of it like a table name.
 const Entity = "Config"
+
+// Global describes some configuration parameters that are required for the API to function.
+type Global struct {
+	// AuthSecret is the secret key by which all JWTs are signed using a SHA-256 HMAC.
+	AuthSecret string `json:",omitempty"`
+	// ValidOriginSuffix is the suffix for which CORS requests are valid for this app.
+	ValidOriginSuffix string `json:",omitempty"`
+}
 
 // Config is a type that can represent the full state of the application at any time.
 // It's quite slow because it has to rely on reflection. Use config.Get to pull config
@@ -63,36 +71,27 @@ func (conf *Config) MarshalJSON() ([]byte, error) {
 
 }
 
-// Global describes some configuration parameters that are required for the API to function.
-type Global struct {
-	// AuthSecret is the secret key by which all JWTs are signed using a SHA-256 HMAC.
-	AuthSecret string `json:",omitempty"`
-	// ValidOriginSuffix is the suffix for which CORS requests are valid for this app.
-	ValidOriginSuffix string `json:",omitempty"`
-}
-
-// retrieve obtains the application configuration as a *Config.
-func retrieve(ctx context.Context) (*Config, error) {
+// retrieve obtains the application configuration as a datastore.PropertyList.
+func retrieve(ctx context.Context) (datastore.PropertyList, error) {
 
 	p := datastore.PropertyList(make([]datastore.Property, 0, 8))
 	key := datastore.NewKey(ctx, Entity, Entity, 0, nil)
 	err := nds.Get(ctx, key, &p)
-	asConfig := Config(p)
-	return &asConfig, err
+	return p, err
 
 }
 
 // Get stores the application configuration in the variable pointed to by conf.
 func Get(ctx context.Context, conf interface{}) error {
 
-	switch t := ctx.Value(configContextKey).(type) {
-	case *Config:
+	switch t := ctx.Value(internal.ConfigContextKey).(type) {
+	case *datastore.PropertyList:
 		switch confT := conf.(type) {
 		case *Config:
-			*confT = *t
+			*confT = Config(*t)
 			return nil
 		default:
-			err := datastore.LoadStruct(conf, []datastore.Property(*t))
+			err := datastore.LoadStruct(conf, *t)
 			switch err.(type) {
 			case *datastore.ErrFieldMismatch:
 				return nil

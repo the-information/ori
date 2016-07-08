@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/the-information/ori/internal"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
@@ -19,7 +20,7 @@ func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) con
 		log.Errorf(ctx, "Could not retrieve config: %s", err)
 		return nil
 	} else {
-		return context.WithValue(ctx, configContextKey, conf)
+		return context.WithValue(ctx, internal.ConfigContextKey, &conf)
 	}
 
 }
