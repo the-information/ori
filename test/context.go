@@ -2,47 +2,32 @@
 package test
 
 import (
-	"github.com/the-information/ori/config"
+	"github.com/the-information/ori/internal"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
 )
 
-// BlessContext "blesses" a context.Context by attaching the supplied configuration and authorized account.
-// conf must be a struct, an error, or it mus implement PropertyLoadSaver.
-// authorizedAccount must be an *account.Account or nil.
-// See the documentation for google.golang.org/appengine/aetest on NewContext for the other parameters.
-func BlessContext(ctx context.Context, conf interface{}, authorizedAccount interface{}) (context.Context, error) {
+// WithConfig returns a new context.Context based on ctx with the supplied configuration
+// variables set.
+func WithConfig(ctx context.Context, conf map[string]interface{}) context.Context {
 
-	var props []datastore.Property
-	var err error
+	l := make([]datastore.Property, 0, len(conf))
 
-	switch t := conf.(type) {
-	case error:
-		ctx = context.WithValue(ctx, "__config_ctx", conf)
-
-	case datastore.PropertyLoadSaver:
-		props, err = t.Save()
-		configObject := config.Config(props)
-		if err != nil {
-			return nil, err
-		}
-		ctx = context.WithValue(ctx, "__config_ctx", &configObject)
-
-	default:
-		props, err = datastore.SaveStruct(conf)
-		configObject := config.Config(props)
-		if err != nil {
-			return nil, err
-		}
-		ctx = context.WithValue(ctx, "__config_ctx", &configObject)
+	for k, v := range conf {
+		l = append(l, datastore.Property{
+			Name:  k,
+			Value: v,
+		})
 	}
 
-	if err != nil {
-		return nil, err
-	}
+	asList := datastore.PropertyList(l)
 
-	ctx = context.WithValue(ctx, "__auth_ctx", authorizedAccount)
+	return context.WithValue(ctx, internal.ConfigContextKey, &asList)
 
-	return ctx, nil
+}
 
+// WithAuthorizedAccount returns a new context.Context based on ctx with the supplied
+// account associated with it.
+func WithAuthorizedAccount(ctx context.Context, authorizedAccount interface{}) context.Context {
+	return context.WithValue(ctx, internal.AuthContextKey, authorizedAccount)
 }

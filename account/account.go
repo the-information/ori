@@ -12,8 +12,6 @@ import (
 	"time"
 )
 
-var authKey string = "__auth_ctx"
-
 var xgTransaction = &datastore.TransactionOptions{
 	XG: true,
 }
@@ -86,6 +84,17 @@ var (
 		Roles: []string{},
 	}
 )
+
+// IsZero returns true if the account object is the zero value for the Account type.
+func (a *Account) IsZero() bool {
+	return (a.flag == 0 &&
+		a.CreatedAt.IsZero() &&
+		a.LastUpdatedAt.IsZero() &&
+		a.Email == "" &&
+		len(a.SecurePassword) == 0 &&
+		len(a.Roles) == 0 &&
+		a.originalEmail == "")
+}
 
 // HasRole checks if account has role role.
 func (a *Account) HasRole(role string) bool {

@@ -10,6 +10,10 @@ import (
 	"time"
 )
 
+// AllScope is the auth scope set when a token is valid for all
+// of a user's roles.
+var AllScope = "__ALL"
+
 // All errors returned by package auth have type Error, so they
 // can be differentiated in a type switch as follows:
 //
@@ -37,7 +41,7 @@ var (
 	// the JWT supplied to a Decode call is actually just the
 	// auth secret itself. A Super user can perform literally
 	// any action it is possible to perform.
-	SuperClaimSet *jws.ClaimSet = &jws.ClaimSet{
+	SuperClaimSet = &jws.ClaimSet{
 		Sub: "_super",
 		Exp: time.Now().AddDate(10, 0, 0).Unix(),
 	}
@@ -134,12 +138,31 @@ func Decode(jwt []byte, secret []byte) (*jws.ClaimSet, error) {
 	// decode the claim set and ensure it hasn't expired
 	now := time.Now().Unix()
 	claimSet, err := jws.Decode(string(jwt))
-
 	if err != nil {
 		return nil, err
 	} else if claimSet.Exp <= now {
 		return nil, ExpiredJWTError
 	}
+	payloadBytes, err := base64.RawURLEncoding.DecodeString(string(payload))
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO(goldibex): This operation is likely to be quite slow due to reflection
+	// Ideally, what we want is to accept an interface{} to decode the private claims
+	// of the JWT into for the client
+	claimSet.PrivateClaims = map[string]interface{}{}
+	err = json.Unmarshal(payloadBytes, &claimSet.PrivateClaims)
+	if err != nil {
+		return nil, err
+	}
+
+	delete(claimSet.PrivateClaims, "iss")
+	delete(claimSet.PrivateClaims, "sub")
+	delete(claimSet.PrivateClaims, "iat")
+	delete(claimSet.PrivateClaims, "exp")
+	delete(claimSet.PrivateClaims, "aud")
+	delete(claimSet.PrivateClaims, "scope")
 
 	// now that we've got a valid authorization claim,
 	// get the associated object from the datastore

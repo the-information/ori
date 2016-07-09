@@ -2,6 +2,7 @@ package rest
 
 import (
 	"github.com/guregu/kami"
+	"github.com/the-information/ori/internal"
 	"golang.org/x/net/context"
 )
 
@@ -21,7 +22,7 @@ func Param(ctx context.Context, name string) string {
 	}
 
 	// if kami has nothing, let's try to read parameters set by the test framework
-	switch t := ctx.Value("__param_ctx").(type) {
+	switch t := ctx.Value(internal.ParamContextKey).(type) {
 	default:
 		return ""
 	case map[string]string:

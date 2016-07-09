@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"github.com/guregu/kami"
 	"github.com/the-information/ori/account"
-	"github.com/the-information/ori/config"
+	"github.com/the-information/ori/internal"
 	"golang.org/x/net/context"
+	"golang.org/x/oauth2/jws"
+	"google.golang.org/appengine/datastore"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 )
 
 /*
@@ -18,14 +21,16 @@ the authenticated account, and the route parameters that underlay the invocation
 */
 type HandlerState struct {
 	body        interface{}
-	config      *config.Config
+	config      interface{}
 	account     *account.Account
+	scope       string
 	routeParams map[string]string
 }
 
 func NewState() *HandlerState {
 	s := new(HandlerState)
 	s.routeParams = make(map[string]string, 1)
+	s.account = &account.Nobody
 	return s
 }
 
@@ -34,14 +39,14 @@ func (s *HandlerState) Body(b interface{}) *HandlerState {
 	return s
 }
 
+func (s *HandlerState) Scope(scope string) *HandlerState {
+	s.scope = scope
+	return s
+}
+
 func (s *HandlerState) Config(c interface{}) *HandlerState {
 
-	s.config = &config.Config{}
-	if data, err := json.Marshal(c); err != nil {
-		panic(err)
-	} else if err := json.Unmarshal(data, &s.config); err != nil {
-		panic(err)
-	}
+	s.config = c
 	return s
 
 }
@@ -79,9 +84,35 @@ func (s *HandlerState) Run(ctx context.Context, handler kami.HandlerFunc) *httpt
 	if err != nil {
 		panic(err)
 	}
-	ctx = context.WithValue(ctx, "__config_ctx", s.config)
-	ctx = context.WithValue(ctx, "__auth_ctx", s.account)
-	ctx = context.WithValue(ctx, "__param_ctx", s.routeParams)
+
+	var configPropList datastore.PropertyList
+
+	if s.config != nil {
+
+		props, err := datastore.SaveStruct(s.config)
+		if err != nil {
+			panic(err)
+		}
+		configPropList = props
+	} else {
+		configPropList = datastore.PropertyList{}
+	}
+
+	ctx = context.WithValue(ctx, internal.ConfigContextKey, &configPropList)
+	ctx = context.WithValue(ctx, internal.AuthContextKey, s.account)
+	if s.scope != "" {
+		ctx = context.WithValue(ctx, internal.ClaimSetContextKey, &jws.ClaimSet{
+			Scope: s.scope,
+			Sub:   s.account.Email,
+		})
+	} else {
+		ctx = context.WithValue(ctx, internal.ClaimSetContextKey, &jws.ClaimSet{
+			Scope: strings.Join(s.account.Roles, ","),
+			Sub:   s.account.Email,
+		})
+	}
+
+	ctx = context.WithValue(ctx, internal.ParamContextKey, s.routeParams)
 
 	handler(ctx, w, r)
 

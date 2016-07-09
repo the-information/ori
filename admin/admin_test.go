@@ -31,22 +31,21 @@ func TestMain(m *testing.M) {
 
 func Test_getConfig(t *testing.T) {
 
-	conf := config.Global{
-		AuthSecret:        "fake-secret",
-		ValidOriginSuffix: "example.com",
-	}
-	conf2 := config.Global{}
-
 	w := httptest.NewRecorder()
-	ctx2, _ := test.BlessContext(ctx, &conf, nil)
+	ctx2 := test.WithConfig(ctx, map[string]interface{}{
+		"AuthSecret":        "fake-secret",
+		"ValidOriginSuffix": "example.com",
+	})
+
+	result := map[string]string{}
 
 	getConfig(ctx2, w, nil)
 	if w.Code != http.StatusOK {
 		t.Errorf("Expected status code OK, got %d, error %s", w.Code, w.Body.String())
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &conf2); err != nil {
+	if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil {
 		t.Errorf("Unexpected error %s on unmarshal", err)
-	} else if conf != conf2 {
+	} else if result["AuthSecret"] != "fake-secret" || result["ValidOriginSuffix"] != "example.com" {
 		t.Errorf("Unexpected response body: %s", w.Body.String())
 	}
 
