@@ -16,7 +16,7 @@ var ErrDatastoreLimitTooLarge = errors.New("The limit specified by this query wa
 /*
 DatastoreWithValues produces a *datastore.Query given a set of URL query parameters.
 Given a query string that looks like the following,
-	Size=large&Price_gt=100&Price_lt=500&ForSale=true&SaleUntil_le=2020-01-01T00%3A00%3A00Z&_order=-Price
+	Size=large&Price_gt=100&Price_lt=500&ForSale=true&_order=-Price
 This code:
 	q := query.DatastoreWithValues("Widget", r.URL.Query())
 is equivalent to this code:
@@ -25,7 +25,6 @@ is equivalent to this code:
 		Filter("Price >", 100).
 		Filter("Price <", 500).
 		Filter("ForSale =", true).
-		Filter("SaleUntil", time.Parse("2020-01-01T00:00:00Z")
 		Order("-Price")
 
 The following four query keys are treated specially:
