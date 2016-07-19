@@ -80,31 +80,21 @@ func (e *entity) UnmarshalJSON(data []byte) error {
 		case json.Delim:
 			if t.String() == "[" {
 
+				// advance the main decoder, our "peek" has told us it's safe
+				decoder.Token()
+
 				for decoder.More() {
-
-					if err = peekDecoder.Decode(&value); err != nil {
-						// see if there's an answering ]
-						if closeToken, err2 := peekDecoder.Token(); err2 != nil {
-							return err2
-						} else {
-							switch ct := closeToken.(type) {
-							case json.Delim:
-								if ct.String() == "]" {
-									return nil
-								} else {
-									return err
-								}
-							default:
-								return err
-							}
-						}
+					if err = decoder.Decode(&value); err != nil {
+						return err
 					}
-
 					value.Property.Multiple = true
 					value.Property.Name = nextPropertyName
 					*e = append(*e, value.Property)
-
 				}
+
+				// advance past the closing bracket
+				decoder.Token()
+				continue
 
 			}
 

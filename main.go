@@ -23,11 +23,6 @@ func init() {
 
 	flags = []cli.Flag{
 		cli.StringFlag{
-			Name:  "path",
-			Value: pwd + "/ori.yaml",
-			Usage: "Path to ori.yaml",
-		},
-		cli.StringFlag{
 			Name:   "app",
 			Value:  "http://localhost:8080",
 			Usage:  "URL to address App Engine app at",
@@ -48,8 +43,20 @@ func init() {
 	commands = []cli.Command{
 		{
 			Name:   "init",
-			Usage:  "Set initial configuration from ori.yaml to an application",
-			Action: func(c *cli.Context) error { return nil },
+			Usage:  "Generate a new auth secret and load data from seed.json",
+			Action: cmd.Initialize,
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "seed",
+					Value: pwd + "/seed.json",
+					Usage: "Path to seed.json",
+				},
+			},
+		},
+		{
+			Name:   "load",
+			Usage:  "Import JSON from stdin to an application",
+			Action: cmd.LoadEntities,
 		},
 		{
 			Name:  "config",

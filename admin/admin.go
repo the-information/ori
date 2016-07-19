@@ -6,6 +6,7 @@ import (
 	"github.com/guregu/kami"
 	"github.com/the-information/ori/account"
 	"github.com/the-information/ori/account/auth"
+	"github.com/the-information/ori/admin/dsimport"
 	"github.com/the-information/ori/config"
 	"github.com/the-information/ori/rest"
 	"golang.org/x/net/context"
@@ -34,6 +35,8 @@ func NewHandler(route string) *kami.Mux {
 	ori.Delete(route+"accounts/:id", auth.Check(auth.Super).Then(deleteAccount))
 	ori.Patch(route+"accounts/:id", auth.Check(auth.Super).Then(changeAccount))
 	ori.Post(route+"accounts/:id/password", auth.Check(auth.Super).Then(changeAccountPassword))
+
+	ori.Post(route+"load", auth.Check(auth.Super).Then(loadEntities))
 
 	return ori
 
@@ -197,6 +200,16 @@ func changeAccountPassword(ctx context.Context, w http.ResponseWriter, r *http.R
 	} else if err := acct.SetPassword(newPassword); err != nil {
 		rest.WriteJSON(w, err)
 	} else if err := account.Save(ctx, &acct); err != nil {
+		rest.WriteJSON(w, err)
+	} else {
+		rest.WriteJSON(w, &rest.NoContent)
+	}
+
+}
+
+func loadEntities(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+
+	if err := dsimport.Process(ctx, r.Body); err != nil {
 		rest.WriteJSON(w, err)
 	} else {
 		rest.WriteJSON(w, &rest.NoContent)

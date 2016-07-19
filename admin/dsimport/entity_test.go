@@ -3,7 +3,9 @@ package dsimport
 import (
 	"encoding/json"
 	"google.golang.org/appengine/datastore"
+	"reflect"
 	"testing"
+	"time"
 )
 
 func Test_importEntity(t *testing.T) {
@@ -66,7 +68,6 @@ func Test_importEntity(t *testing.T) {
 	}
 	if e[1].Name != "foo" || e[1].Value.(string) != "baz" || !e[1].Multiple {
 		t.Errorf("Unexpected value for e[1]: %+v", e[1])
-
 	}
 	if e[2].Name != "foo" || e[2].Value.(string) != "quux" || !e[2].Multiple {
 		t.Errorf("Unexpected value for e[2]: %+v", e[2])
@@ -83,12 +84,47 @@ func Test_importEntity(t *testing.T) {
 		"BMI": 21.2
 	}`)
 
+	expectedResults := []datastore.Property{
+		{
+			Name:  "CreatedAt",
+			Value: time.Date(2011, 06, 12, 12, 30, 0, 0, time.UTC),
+		},
+		{
+			Name:  "Name",
+			Value: "Jane Q. Public",
+		},
+		{
+			Name:     "LotteryNumbers",
+			Multiple: true,
+			Value:    int64(0),
+		},
+		{
+			Name:     "LotteryNumbers",
+			Multiple: true,
+			Value:    int64(7),
+		},
+		{
+			Name:     "LotteryNumbers",
+			Multiple: true,
+			Value:    int64(19),
+		},
+		{
+			Name:     "LotteryNumbers",
+			Multiple: true,
+			Value:    int64(36),
+		},
+		{
+			Name:  "BMI",
+			Value: float64(21.2),
+		},
+	}
+
 	if err := json.Unmarshal(fullTestJSON, &e); err != nil {
 		t.Errorf("Unexpected error %s", err)
 	}
 
-	if len(e) != 7 {
-		t.Errorf("Expected 7 properties, got %d", len(e))
+	if !reflect.DeepEqual([]datastore.Property(e), expectedResults) {
+		t.Errorf("Got unexpected result set %S", []datastore.Property(e))
 	}
 
 }
