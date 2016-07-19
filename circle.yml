@@ -8,7 +8,7 @@ machine:
 dependencies:
   override:
     - cd $HOME && curl -o gae.zip https://storage.googleapis.com/appengine-sdks/featured/go_appengine_sdk_linux_amd64-${GO_APP_ENGINE_VERSION}.zip && unzip -d $HOME gae.zip
-    - goapp install -t -d -v $PACKAGES
+    - goapp install -t -d -v ${PACKAGES}
 test:
   override:
-    - goapp test -v --race $PACKAGES
+    - goapp test -v --race ${PACKAGES}
