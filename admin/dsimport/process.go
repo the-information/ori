@@ -35,8 +35,9 @@ func Process(ctx context.Context, r io.Reader) error {
 
 	for decoder.More() {
 
-		var encodedEntityKey string
+		encodedEntityKey := ""
 		nextEntity := entity{}
+		nextPropertyList := []datastore.Property{}
 
 		token, err = decoder.Token()
 		if err != nil {
@@ -58,8 +59,10 @@ func Process(ctx context.Context, r io.Reader) error {
 
 		if err := decoder.Decode(&nextEntity); err != nil {
 			return err
+		} else if err := nextEntity.FetchProperties(ctx, &nextPropertyList); err != nil {
+			return err
 		} else {
-			values = append(values, datastore.PropertyList(nextEntity))
+			values = append(values, nextPropertyList)
 		}
 
 		// flush if necessary

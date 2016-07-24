@@ -3,6 +3,7 @@ package admin
 import (
 	"encoding/base64"
 	"encoding/json"
+	"github.com/qedus/nds"
 	"github.com/the-information/ori/account"
 	"github.com/the-information/ori/config"
 	"github.com/the-information/ori/test"
@@ -12,7 +13,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"testing"
+	"time"
 )
 
 var ctx context.Context
@@ -226,6 +229,107 @@ func Test_deleteAccount(t *testing.T) {
 
 	if err := account.Get(ctx, "moveto@bar.com", &acct); err != datastore.ErrNoSuchEntity {
 		t.Errorf("Got unexpected error %s while reading account again after delete", err)
+	}
+
+}
+
+type Blivet struct {
+	Mark    int64
+	Percent float64
+	Shape   string
+}
+
+type Widget struct {
+	Blivets   []*datastore.Key
+	CreatedAt time.Time
+}
+
+func Test_loadEntities(t *testing.T) {
+
+	loadData := json.RawMessage(`{
+		"Blivet/1": {
+			"Mark": 5,
+			"Percent": 34.999997,
+			"Shape": "average"
+		},
+		"Blivet/2": {
+			"Mark": 4,
+			"Percent": 38.595,
+			"Shape": "perfect"
+		},
+		"Widget/foo": {
+			"Blivets": [{
+				"Type": "key",
+				"Value": "Blivet/1"
+			}, {
+				"Type": "key",
+				"Value": "Blivet/2"
+			}],
+			"CreatedAt": {
+				"Type": "time",
+				"Value": "2016-01-01T10:00:00Z"
+			}
+		}
+	}`)
+
+	w := test.NewState().
+		Body(&loadData).
+		Run(ctx, loadEntities)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("Expected http.StatusNoContent (204), got %d instead", w.Code)
+	}
+
+	// retrieve the datastore objects we just created and make sure they look the way we expect them to
+	blivets := make([]Blivet, 2)
+
+	blivet1Key := datastore.NewKey(ctx, "Blivet", "", 1, nil)
+	blivet2Key := datastore.NewKey(ctx, "Blivet", "", 2, nil)
+
+	expectedBlivet1 := Blivet{
+		Mark:    5,
+		Percent: 34.999997,
+		Shape:   "average",
+	}
+
+	expectedBlivet2 := Blivet{
+		Mark:    4,
+		Percent: 38.595,
+		Shape:   "perfect",
+	}
+
+	if err := nds.GetMulti(ctx, []*datastore.Key{blivet1Key, blivet2Key}, blivets); err != nil {
+		t.Fatalf("Unexpected error %s attempting to get blivets", err)
+	} else if len(blivets) != 2 {
+		t.Fatalf("Expected 2 blivets, got %d", len(blivets))
+	}
+
+	if !reflect.DeepEqual(blivets[0], expectedBlivet1) {
+		t.Errorf("Expected blivet 1 to be %+v, got %+v", expectedBlivet1, blivets[0])
+	}
+
+	if !reflect.DeepEqual(blivets[1], expectedBlivet2) {
+		t.Errorf("Expected blivet 2 to be %+v, got %+v", expectedBlivet2, blivets[1])
+	}
+
+	// now the widget!
+	var widget Widget
+
+	widgetKey := datastore.NewKey(ctx, "Widget", "foo", 0, nil)
+	if err := nds.Get(ctx, widgetKey, &widget); err != nil {
+		t.Fatalf("Unexpected error %s while getting widget", err)
+	}
+
+	if widget.CreatedAt.UTC() != time.Date(2016, 1, 1, 10, 0, 0, 0, time.UTC) {
+		t.Errorf("Unexpected CreatedAt %s for widget", widget.CreatedAt)
+	}
+
+	if len(widget.Blivets) != 2 {
+		t.Errorf("Expected widget to have 2 blivet keys, got %d", len(widget.Blivets))
+	}
+
+	if !widget.Blivets[0].Equal(blivet1Key) || !widget.Blivets[1].Equal(blivet2Key) {
+		t.Errorf("Wrong blivet keys for widget: got %+v", widget.Blivets)
 	}
 
 }

@@ -16,6 +16,8 @@ import (
 var ErrInvalidEncodedKey = errors.New("Invalid encoded datastore key")
 var ErrUnknownType = errors.New("Unknown type")
 
+type innerKey string
+
 func decodeDatastoreKey(ctx context.Context, encodedString string) (*datastore.Key, error) {
 
 	segments := strings.Split(encodedString, "/")
@@ -51,129 +53,191 @@ func decodeDatastoreKey(ctx context.Context, encodedString string) (*datastore.K
 
 }
 
-type innerExplicitValue struct {
-	Type     string
-	Value    interface{}
-	NoIndex  bool
-	Property datastore.Property `json:"-"`
-	ctx      context.Context
+type explicitValue struct {
+	Type    string
+	Value   interface{}
+	NoIndex bool
 }
 
-type explicitValue innerExplicitValue
+type innerValue struct {
+	Value   interface{}
+	NoIndex bool
+}
 
-func (ex *explicitValue) UnmarshalJSON(data []byte) error {
+func (iv *innerValue) explicit(data []byte) error {
+
+	var ex explicitValue
 
 	var err error
-
-	ex.Property = datastore.Property{}
-	inner := innerExplicitValue(*ex)
+	var int64Val int64
+	var float64Val float64
 
 	decoder := json.NewDecoder(bytes.NewBuffer(data))
 	decoder.UseNumber()
 
-	if err = decoder.Decode(&inner); err != nil {
+	if err = decoder.Decode(&ex); err != nil {
 		return err
 	}
 
-	ex.Property.NoIndex = inner.NoIndex
-
-	switch inner.Type {
+	iv.NoIndex = ex.NoIndex
+	switch ex.Type {
 	case "time":
-		if ex.Property.Value, err = time.Parse(time.RFC3339, inner.Value.(string)); err != nil {
-			return err
-		}
+		iv.Value, err = time.Parse(time.RFC3339, ex.Value.(string))
 	case "int8":
-		if int64Val, err := inner.Value.(json.Number).Int64(); err != nil {
+		if int64Val, err = ex.Value.(json.Number).Int64(); err != nil {
 			return err
 		} else {
-			ex.Property.Value = int8(int64Val)
+			iv.Value = int8(int64Val)
 		}
 	case "int16":
-		if int64Val, err := inner.Value.(json.Number).Int64(); err != nil {
+		if int64Val, err = ex.Value.(json.Number).Int64(); err != nil {
 			return err
 		} else {
-			ex.Property.Value = int16(int64Val)
+			iv.Value = int16(int64Val)
 		}
 	case "int32":
-		if int64Val, err := inner.Value.(json.Number).Int64(); err != nil {
+		if int64Val, err = ex.Value.(json.Number).Int64(); err != nil {
 			return err
 		} else {
-			ex.Property.Value = int32(int64Val)
+			iv.Value = int32(int64Val)
 		}
 	case "int64":
-		if int64Val, err := inner.Value.(json.Number).Int64(); err != nil {
+		if int64Val, err = ex.Value.(json.Number).Int64(); err != nil {
 			return err
 		} else {
-			ex.Property.Value = int64Val
+			iv.Value = int64Val
 		}
 	case "bool":
-		ex.Property.Value = inner.Value.(bool)
+		iv.Value = ex.Value.(bool)
 	case "string":
-		ex.Property.Value = inner.Value.(string)
+		iv.Value = ex.Value.(string)
 	case "float32":
-		if float64Val, err := inner.Value.(json.Number).Float64(); err != nil {
+		if float64Val, err = ex.Value.(json.Number).Float64(); err != nil {
 			return err
 		} else {
-			ex.Property.Value = float32(float64Val)
+			iv.Value = float32(float64Val)
 		}
 	case "float64":
-		if ex.Property.Value, err = inner.Value.(json.Number).Float64(); err != nil {
-			return err
-		}
+		iv.Value, err = ex.Value.(json.Number).Float64()
 	case "binary":
-		if ex.Property.Value, err = base64.RawURLEncoding.DecodeString(inner.Value.(string)); err != nil {
-			return err
-		}
+		iv.Value, err = base64.RawURLEncoding.DecodeString(ex.Value.(string))
 	case "key":
-		if ex.Property.Value, err = decodeDatastoreKey(ex.ctx, inner.Value.(string)); err != nil {
-			return err
-		}
+		iv.Value = innerKey(ex.Value.(string))
 	default:
-		return ErrUnknownType
+		err = ErrUnknownType
 	}
 
-	return nil
+	return err
 
 }
 
-type importValue struct {
-	Property datastore.Property
-	ctx      context.Context
-}
-
-func (i *importValue) UnmarshalJSON(data []byte) error {
-
-	i.Property = datastore.Property{}
+func (iv *innerValue) implicit(data []byte) error {
 
 	decoder := json.NewDecoder(bytes.NewBuffer(data))
 	decoder.UseNumber()
-
 	token, err := decoder.Token()
 	if err != nil {
 		return err
 	}
 
 	switch t := token.(type) {
-	case json.Delim:
-		ex := explicitValue{ctx: i.ctx}
-		if err := json.Unmarshal(data, &ex); err != nil {
-			return err
-		}
-		i.Property = ex.Property
+
 	case json.Number:
 
 		if intVal, err := t.Int64(); err == nil {
-			i.Property.Value = intVal
+			iv.Value = intVal
 		} else if floatVal, err := t.Float64(); err == nil {
-			i.Property.Value = floatVal
+			iv.Value = floatVal
 		} else {
 			return err
 		}
 
 	default:
-		i.Property.Value = t
+		iv.Value = t
 	}
 
-	return err
+	return nil
+
+}
+
+func (iv *innerValue) UnmarshalJSON(data []byte) error {
+
+	if rune(data[0]) == '{' {
+		return iv.explicit(data)
+	} else {
+		return iv.implicit(data)
+	}
+
+}
+
+type Value struct {
+	v []innerValue
+}
+
+func (v *Value) FetchProperties(ctx context.Context, name string, buf *[]datastore.Property) error {
+
+	isMulti := len(v.v) > 1
+	for _, value := range v.v {
+
+		var v interface{}
+		switch t := value.Value.(type) {
+		case innerKey:
+			if proposedKey, err := decodeDatastoreKey(ctx, string(t)); err != nil {
+				return err
+			} else {
+				v = proposedKey
+			}
+		default:
+			v = value.Value
+		}
+
+		*buf = append(*buf, datastore.Property{
+			Name:     name,
+			Value:    v,
+			NoIndex:  value.NoIndex,
+			Multiple: isMulti,
+		})
+
+	}
+
+	return nil
+
+}
+
+func (v *Value) UnmarshalJSON(data []byte) error {
+
+	var iv innerValue
+
+	switch rune(data[0]) {
+	case '[':
+		// array of values
+		if v.v == nil {
+			v.v = []innerValue{}
+		}
+
+		// get a decoder
+		decoder := json.NewDecoder(bytes.NewBuffer(data))
+		// advance past the opening bracket
+		decoder.Token()
+
+		for decoder.More() {
+
+			if err := decoder.Decode(&iv); err != nil {
+				return err
+			}
+			v.v = append(v.v, iv)
+			iv = innerValue{}
+
+		}
+
+	default:
+		if err := iv.UnmarshalJSON(data); err != nil {
+			return err
+		}
+		v.v = []innerValue{iv}
+
+	}
+
+	return nil
 
 }
