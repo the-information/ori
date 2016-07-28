@@ -92,10 +92,9 @@ func Get(ctx context.Context, conf interface{}) error {
 			return nil
 		default:
 			err := datastore.LoadStruct(conf, *t)
-			switch err.(type) {
-			case *datastore.ErrFieldMismatch:
+			if _, ok := err.(*datastore.ErrFieldMismatch); ok {
 				return nil
-			default:
+			} else {
 				return err
 			}
 		}
@@ -122,8 +121,7 @@ func Get(ctx context.Context, conf interface{}) error {
 // the entire contents of the configuration with the contents of Config.
 func Save(ctx context.Context, conf interface{}) error {
 
-	switch typedConfig := conf.(type) {
-	case *Config:
+	if typedConfig, ok := conf.(*Config); ok {
 		pl := datastore.PropertyList(*typedConfig)
 		replaceKey := datastore.NewKey(ctx, Entity, Entity, 0, nil)
 		_, replaceErr := nds.Put(ctx, replaceKey, &pl)
@@ -144,9 +142,10 @@ func Save(ctx context.Context, conf interface{}) error {
 
 		configTheSame := reflect.DeepEqual(existingConf.Interface(), dbConf.Interface())
 
+		_, isMismatch := err.(*datastore.ErrFieldMismatch)
 		if err == nil && !configTheSame {
 			return ErrConflict
-		} else if err != nil && err != datastore.ErrNoSuchEntity {
+		} else if err != nil && !isMismatch && err != datastore.ErrNoSuchEntity {
 			return err
 		}
 
