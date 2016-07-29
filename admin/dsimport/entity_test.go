@@ -3,6 +3,7 @@ package dsimport
 import (
 	"encoding/json"
 	"golang.org/x/net/context"
+	"google.golang.org/appengine/datastore"
 	"reflect"
 	"testing"
 	"time"
