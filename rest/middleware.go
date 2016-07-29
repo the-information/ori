@@ -70,8 +70,8 @@ func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) con
 
 		if r.Method == "OPTIONS" {
 			// Options call. Intercept and do not forward.
-			w.Header().Set("Access-Control-Allow-Headers", "Accept, Accept-Charset, Content-Type, Authorization")
-			w.Header().Set("Access-Control-Expose-Headers", "Content-Type, Accept, Accept-Charset, Link, Location")
+			w.Header().Set("Access-Control-Allow-Headers", "Accept, Accept-Charset, Content-Type, Authorization, X-CORS")
+			w.Header().Set("Access-Control-Expose-Headers", "Content-Type, Accept, Accept-Charset, Link, Location, X-CORS")
 			w.Header().Set("Access-Control-Max-Age", "3600")
 			w.WriteHeader(http.StatusNoContent)
 			return nil
