@@ -8,7 +8,6 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/datastore"
 	"net/http"
-	"reflect"
 )
 
 var ErrNotInConfigContext = errors.New(http.StatusInternalServerError, "That context was not run through the ori/config middleware")
@@ -110,10 +109,6 @@ func Get(ctx context.Context, conf interface{}) error {
 // the values in conf. All HTTP requests subsequent to this one
 // are guaranteed to use the new values in their configuration.
 //
-// Save functions atomically, meaning that if somebody else
-// has modified the configuration in the interim between when you
-// made changes and saved them, ErrConflict is returned.
-//
 // Note that subsequent calls to Get with the same request context
 // will continue to retrieve the old version of the configuration.
 //
@@ -128,28 +123,42 @@ func Save(ctx context.Context, conf interface{}) error {
 		return replaceErr
 	}
 
-	existingConf := reflect.New(reflect.TypeOf(conf).Elem())
-
-	if err := Get(ctx, existingConf.Interface()); err != nil {
-		return err
-	}
-
 	return datastore.RunInTransaction(ctx, func(txCtx context.Context) error {
 
-		dbConf := reflect.New(reflect.TypeOf(conf).Elem())
+		props := datastore.PropertyList{}
+
 		key := datastore.NewKey(txCtx, Entity, Entity, 0, nil)
-		err := nds.Get(txCtx, key, dbConf.Interface())
-
-		configTheSame := reflect.DeepEqual(existingConf.Interface(), dbConf.Interface())
-
-		_, isMismatch := err.(*datastore.ErrFieldMismatch)
-		if err == nil && !configTheSame {
-			return ErrConflict
-		} else if err != nil && !isMismatch && err != datastore.ErrNoSuchEntity {
+		if err := nds.Get(txCtx, key, &props); err != nil && err != datastore.ErrNoSuchEntity {
 			return err
 		}
 
-		_, err = nds.Put(txCtx, key, conf)
+		// merge existing config with the new values
+		if newProps, err := datastore.SaveStruct(conf); err != nil {
+			return err
+		} else {
+
+			for _, newProp := range newProps {
+				newProp.NoIndex = true
+				replacing := false
+				for _, prop := range props {
+					// make sure NoIndex is set
+					prop.NoIndex = true
+					if prop.Name == newProp.Name {
+						replacing = true
+						prop.Value = newProp.Value
+						break
+					}
+				}
+				if !replacing {
+					// append
+					props = append(props, newProp)
+				}
+
+			}
+
+		}
+
+		_, err := nds.Put(txCtx, key, &props)
 		return err
 
 	}, nil)

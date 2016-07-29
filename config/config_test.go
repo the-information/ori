@@ -42,10 +42,6 @@ func TestSave(t *testing.T) {
 		t.Errorf("Got unexpected value for configuration: %+v", fake2)
 	}
 
-	if err := Save(ctx, &fake3); err != ErrConflict {
-		t.Errorf("Expected ErrConflict while saving fake3, but got %s", err)
-	}
-
 	if err := Get(ctx2, &fake3); err != nil {
 		t.Errorf("Expected to get no error, but got %s", err)
 	}
