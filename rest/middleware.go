@@ -66,6 +66,7 @@ func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) con
 		// as an allowed origin
 		if r.Header.Get("Origin") != "" {
 			w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
 
 		if r.Method == "OPTIONS" {
