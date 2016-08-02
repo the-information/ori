@@ -140,6 +140,18 @@ func Test_getAccount(t *testing.T) {
 
 }
 
+func Test_getJwt(t *testing.T) {
+
+	id := base64.RawURLEncoding.EncodeToString([]byte("foo@bar.com"))
+	w := test.NewState().
+		Param("id", id).
+		Run(ctx, getJwt)
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected http.StatusOK, but got %d: error %s", w.Code, w.Body.String())
+	}
+	// FIXME(ian): write a test that decodes the jwt that gets passed through here and validates it
+}
+
 func Test_changeAccount(t *testing.T) {
 
 	var acct account.Account

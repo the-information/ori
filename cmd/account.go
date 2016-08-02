@@ -68,6 +68,25 @@ func GetAccount(c *cli.Context) error {
 	return nil
 }
 
+func GetJwt(c *cli.Context) error {
+
+	if c.NArg() != 1 {
+		return cli.NewExitError("Too many or not enough arguments specified", 1)
+	}
+	var jwt string
+
+	key := base64.RawURLEncoding.EncodeToString([]byte(c.Args().Get(0)))
+
+	if err := get(c, "accounts/"+key+"/jwt", &jwt); err != nil {
+		return cli.NewExitError("Server error: "+err.Error(), 1)
+	}
+
+	fmt.Println(jwt)
+
+	return nil
+
+}
+
 func ChangeAccountEmail(c *cli.Context) error {
 
 	if c.NArg() != 2 {

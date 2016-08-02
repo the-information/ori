@@ -106,6 +106,13 @@ func init() {
 					Action:    cmd.GetAccount,
 				},
 				{
+					Name:      "jwt",
+					Usage:     "Get auth jwt for account",
+					ArgsUsage: "email",
+					Action:    cmd.GetJwt,
+				},
+
+				{
 					Name:  "roles",
 					Usage: "Actions related to user roles",
 					Subcommands: []cli.Command{

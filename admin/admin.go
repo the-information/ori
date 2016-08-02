@@ -8,9 +8,13 @@ import (
 	"github.com/the-information/ori/account/auth"
 	"github.com/the-information/ori/admin/dsimport"
 	"github.com/the-information/ori/config"
+	"github.com/the-information/ori/errors"
 	"github.com/the-information/ori/rest"
 	"golang.org/x/net/context"
+	"golang.org/x/oauth2/jws"
 	"net/http"
+	"strings"
+	"time"
 )
 
 // NewHandler returns an http.Handler that supports the ori command-line utility.
@@ -35,12 +39,13 @@ func NewHandler(route string) *kami.Mux {
 	ori.Delete(route+"accounts/:id", auth.Check(auth.Super).Then(deleteAccount))
 	ori.Patch(route+"accounts/:id", auth.Check(auth.Super).Then(changeAccount))
 	ori.Post(route+"accounts/:id/password", auth.Check(auth.Super).Then(changeAccountPassword))
-
+	ori.Get(route+"accounts/:id/jwt", auth.Check(auth.Super).Then(getJwt))
 	ori.Post(route+"load", auth.Check(auth.Super).Then(loadEntities))
 
 	return ori
 
 }
+
 func getConfig(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 
 	conf := config.Config{}
@@ -118,6 +123,52 @@ func deleteAccount(ctx context.Context, w http.ResponseWriter, r *http.Request) 
 
 }
 
+func getJwt(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+
+	var acct account.Account
+	var email string
+	var err error
+
+	conf := config.Global{}
+	if err := config.Get(ctx, &conf); err != nil {
+		rest.WriteJSON(w, err)
+		return
+	}
+
+	// read the account ID
+	if emailBytes, err := base64.RawURLEncoding.DecodeString(rest.Param(ctx, "id")); err != nil {
+		rest.WriteJSON(w, err)
+		return
+	} else {
+		email = string(emailBytes)
+	}
+
+	if err = account.Get(ctx, email, &acct); err != nil {
+		rest.WriteJSON(w, err)
+		return
+	}
+
+	// All set. Generate the JWT.
+	jwt, err := auth.Encode(&jws.ClaimSet{
+		Sub:   acct.Email,
+		Scope: strings.Join(acct.Roles, ","),
+		Exp:   time.Now().AddDate(1, 0, 0).Unix(),
+		PrivateClaims: map[string]interface{}{
+			"n": "DEV USER",
+		},
+	}, []byte(conf.AuthSecret))
+
+	if err != nil {
+		rest.WriteJSON(w, errors.New(http.StatusInternalServerError, "Could not generate JWT"))
+		return
+	} else {
+		jwtString := string(jwt)
+		rest.WriteJSON(w, &jwtString)
+		return
+	}
+
+}
+
 func changeAccount(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 
 	var acct account.Account
@@ -136,7 +187,7 @@ func changeAccount(ctx context.Context, w http.ResponseWriter, r *http.Request) 
 	}
 
 	// read the account and merge it with the request body
-	if account.Get(ctx, email, &acct); err != nil {
+	if err = account.Get(ctx, email, &acct); err != nil {
 		rest.WriteJSON(w, err)
 		return
 	} else if err = rest.ReadJSON(r, &acct); err != nil {
