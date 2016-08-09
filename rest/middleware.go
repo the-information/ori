@@ -23,6 +23,7 @@ func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) con
 	w.Header().Set("Accept", "application/json")
 	w.Header().Set("Accept-Charset", "UTF-8")
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PATCH, DELETE")
 
 	var conf config.Global
 
