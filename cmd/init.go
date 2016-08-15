@@ -41,7 +41,7 @@ func Initialize(c *cli.Context) error {
 	}
 
 	fmt.Println("Add this secret to your environment -- it won't be available again.")
-	fmt.Printf("ORI_AUTH_SECRET=%s\n", newAppSecret)
+	fmt.Printf("export ORI_APP_SECRET=%s\n", newAppSecret)
 	c.GlobalSet("secret", newAppSecret)
 
 	// send to admin
