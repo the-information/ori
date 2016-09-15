@@ -180,22 +180,56 @@ func TestHasRole(t *testing.T) {
 		t.Errorf("Unexpected error, wanted ErrRoleNotInScope, got %s", err)
 	}
 
-	// Claim set is all used up.
-	r.Header.Set("Authorization", test.ConsumableJWT(&jws.ClaimSet{Sub: "foo@bar.com", Scope: AllScope}, "foo", 0))
-	ctx2 = Middleware(ctx, w, r)
-	if err := HasRole("tyrant")(ctx2, w, r); err != ErrClaimSetUsedUp {
-		t.Errorf("Unexpected error, wanted ErrClaimSetUsedUp, got %s", err)
-	}
-
-	// Happy path.
-	r.Header.Set("Authorization", test.ConsumableJWT(&jws.ClaimSet{Sub: "foo@bar.com", Scope: "tyrant"}, "foo", 1))
+	// Token is consumable, but hasn't been used yet.
+	consumableToken := test.ConsumableJWT(&jws.ClaimSet{Sub: "foo@bar.com", Scope: "tyrant"}, "foo", 1)
+	r.Header.Set("Authorization", consumableToken)
 	ctx2 = Middleware(ctx, w, r)
 	if err := HasRole("tyrant")(ctx2, w, r); err != nil {
 		t.Errorf("Unexpected error, wanted nil, got %s", err)
+	}
+
+	// We used this token once already. Should be used up.
+	ctx2 = Middleware(ctx, w, r)
+	if err := HasRole("tyrant")(ctx2, w, r); err != ErrClaimSetUsedUp {
+		t.Errorf("Unexpected error, wanted ErrClaimSetUsedUp, got %s", err)
 	}
 
 }
 
 func TestUseClaimSet(t *testing.T) {
 
+  ctx, done, _ := aetest.NewContext()
+  defer done()
+
+  // claimset without usage counter.
+  cs1 := &jws.ClaimSet{}
+  if err := UseClaimSet(ctx, cs1); err != nil {
+    t.Errorf("Expected no error on claimset without u claim, but got %s", err)
+  }
+
+  // claimset with usage counter but without JTI
+  cs2 := &jws.ClaimSet{
+    PrivateClaims: map[string]interface{}{
+      "u": float64(1),
+    },
+  }
+  if err := UseClaimSet(ctx, cs2); err != ErrInvalidConsumableClaimSet {
+    t.Errorf("Expected ErrInvalidConsumableClaimSet on claimset with u but no JTI, but got %s", err)
+  }
+
+  // using a claimset with u=1 once should be OK...
+  cs3 := &jws.ClaimSet{
+    PrivateClaims: map[string]interface{}{
+      "u": float64(1),
+      "jti": "woot",
+    },
+  }
+  if err := UseClaimSet(ctx, cs3); err != nil {
+    t.Errorf("Expected no error on a good claimset with u=1, but got %s", err)
+  }
+
+  // ... but another use should result in ErrClaimSetUsedUp
+  if err := UseClaimSet(ctx, cs3); err != ErrClaimSetUsedUp {
+    t.Errorf("Expected ErrClaimSetUsedUp on used-up claimset, but got %s", err)
+  }
 }

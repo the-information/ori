@@ -26,15 +26,15 @@ func TestMain(m *testing.M) {
 func TestNewCounter(t *testing.T) {
 
 	// test shard count guard
-	if _, err := NewCounter("foo", 0); err != ErrBadShardCount {
+	if _, err := NewCounter("", "foo", 0); err != ErrBadShardCount {
 		t.Errorf("Wanted ErrBadShardCount, but got %s", err)
 	}
 
-	if _, err := NewCounter("foo", 1001); err != ErrBadShardCount {
+	if _, err := NewCounter("", "foo", 1001); err != ErrBadShardCount {
 		t.Errorf("Wanted ErrBadShardCount, but got %s", err)
 	}
 
-	if _, err := NewCounter("foo", 50); err != nil {
+	if _, err := NewCounter("", "foo", 50); err != nil {
 		t.Errorf("Wanted no error, but got %s", err)
 	}
 
@@ -50,7 +50,7 @@ func TestIncrement(t *testing.T) {
 		go func() {
 
 			time.Sleep((time.Duration(rand.Int63()%7) + 1) * time.Second)
-			ctr, _ := NewCounter("foo", 50)
+			ctr, _ := NewCounter("", "foo", 50)
 			if err := ctr.Increment(ctx, 1); err != nil {
 				t.Errorf("Expected no error when incrementing counter 'foo' by 1, but got %s", err)
 			}
@@ -62,7 +62,7 @@ func TestIncrement(t *testing.T) {
 	wg.Wait()
 
 	// now try in an existing transaction context; should error out
-	ctr, _ := NewCounter("foo", 50)
+	ctr, _ := NewCounter("", "foo", 50)
 
 	txErr := nds.RunInTransaction(ctx, func(txCtx context.Context) error {
 		return ctr.Increment(txCtx, 1)
@@ -76,7 +76,7 @@ func TestIncrement(t *testing.T) {
 
 func TestValue(t *testing.T) {
 
-	ctr, _ := NewCounter("foo", 50)
+	ctr, _ := NewCounter("", "foo", 50)
 
 	if val, err := ctr.Value(ctx); err != nil {
 		t.Errorf("Unexpected error on ctr.Value(ctx): %s", err)
@@ -88,7 +88,7 @@ func TestValue(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 
-	ctr, _ := NewCounter("foo", 50)
+	ctr, _ := NewCounter("", "foo", 50)
 
 	if err := ctr.Delete(ctx); err != nil {
 		t.Errorf("Unexpected error on Delete: %s", err)

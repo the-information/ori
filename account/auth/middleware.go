@@ -2,15 +2,14 @@ package auth
 
 import (
 	"github.com/guregu/kami"
-	"github.com/qedus/nds"
 	"github.com/the-information/ori/account"
 	"github.com/the-information/ori/config"
 	"github.com/the-information/ori/errors"
 	"github.com/the-information/ori/internal"
 	"github.com/the-information/ori/rest"
+	"github.com/the-information/ori/shard"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2/jws"
-	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
 	"net/http"
 	"strings"
@@ -141,6 +140,7 @@ func roleInScope(ctx context.Context, role string) bool {
 // AccountMatchesParam returns an AuthCheck that grants access if paramName is the same
 // as the account's ID; so, for instance, on a route to /accounts/:accountId, with
 // a request to /accounts/asdf, the AuthCheck will return true if the account's ID is asdf.
+// As a special case, account.Nobody and account.Super will never match in this method.
 func AccountMatchesParam(paramName string) AuthCheck {
 
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
@@ -148,6 +148,8 @@ func AccountMatchesParam(paramName string) AuthCheck {
 		var acct account.Account
 		if err := GetAccount(ctx, &acct); err != nil {
 			return err
+		} else if acct.Super() || acct.Nobody() {
+			return ErrAccountIDDoesNotMatch
 		} else if acct.Key(ctx).Encode() != kami.Param(ctx, paramName) {
 			return ErrAccountIDDoesNotMatch
 		} else {
@@ -260,44 +262,29 @@ func GetClaimSet(ctx context.Context, claimSet *jws.ClaimSet) error {
 
 }
 
-// ClaimSetUsageEntity is the entity name for storing token usage data in the Datastore.
-var ClaimSetUsageEntity = "_APITokenUsage"
-
-type claimCount struct {
-	Count int64
-}
+const ClaimSetCounterEntity = "APITokenCounter"
+const ClaimSetCounterShards = 50
 
 // UseClaimSet attempts to consume a claimSet. It returns an error if
-// the claimSet could not be consumed.
+// the claimset could not be consumed.
 func UseClaimSet(ctx context.Context, claimSet *jws.ClaimSet) error {
 
 	if _, ok := claimSet.PrivateClaims["u"]; !ok {
-		// no usage counter; therefore it can never have been "consumed"
+		// This claimset lacks a usage counter, so it's not consumable.
 		return nil
 	} else if _, ok := claimSet.PrivateClaims["jti"]; !ok {
 		// no JTI, so no way to check
 		return ErrInvalidConsumableClaimSet
+	} else if counter, err := shard.NewCounter(ClaimSetCounterEntity, claimSet.PrivateClaims["jti"].(string), ClaimSetCounterShards); err != nil {
+		return err
+	} else if err := counter.Increment(ctx, 1); err != nil {
+		return err
+	} else if uses, err := counter.Value(ctx); err != nil {
+		return err
+	} else if uses > int64(claimSet.PrivateClaims["u"].(float64)) {
+		return ErrClaimSetUsedUp
 	} else {
-
-		return nds.RunInTransaction(ctx, func(txCtx context.Context) error {
-
-			var count claimCount
-
-			// TODO(goldibex): shard this counter to improve throughput
-			consumableClaimSetKey := datastore.NewKey(txCtx, ClaimSetUsageEntity, claimSet.PrivateClaims["jti"].(string), 0, nil)
-			err := nds.Get(txCtx, consumableClaimSetKey, &count)
-			if err != nil && err != datastore.ErrNoSuchEntity {
-				return err
-			} else if count.Count >= int64(claimSet.PrivateClaims["u"].(float64)) {
-				return ErrClaimSetUsedUp
-			} else {
-				count.Count++
-				_, err = nds.Put(txCtx, consumableClaimSetKey, &count)
-				return err
-			}
-
-		}, nil)
-
+		return nil
 	}
 
 }

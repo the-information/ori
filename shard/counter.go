@@ -17,6 +17,7 @@ type count struct {
 // Counter represents a sharded counter stored in the App Engine Datastore and Memcache.
 type Counter struct {
 	name       string
+	entity     string
 	shardCount int
 	shardKeys  []string
 	shardVals  []count
@@ -26,8 +27,8 @@ var (
 	// DefaultCount is the default number of shards for a counter.
 	DefaultCount = 50
 
-	// CounterEntity is the entity name Ori uses to store counters in App Engine Datastore.
-	CounterEntity = "OriCounter"
+	// DefaultCounterEntity is the default entity name Ori uses to store counters in App Engine Datastore.
+	DefaultCounterEntity = "OriCounter"
 )
 
 var (
@@ -40,7 +41,7 @@ var (
 // Counters all pointing to the same counter name like so:
 //	for i := 0; i < 100; i++ {
 //		go func() {
-//			ctr := shard.NewCounter("foo", 100)
+//			ctr := shard.NewCounter("entityType", "foo", 100)
 //			ctr.Increment(ctx, 5)
 //		}()
 // 	}
@@ -50,7 +51,7 @@ var (
 // that shardCount will be between 1 and 1000 (e.g., because you're calling it with a literal value),
 // you can safely ignore the error:
 //	ctr, _ := shard.NewCounter("foo", 100) // 100 is between 1 and 1000, so we can ignore the error
-func NewCounter(name string, shardCount int) (*Counter, error) {
+func NewCounter(entity, name string, shardCount int) (*Counter, error) {
 
 	if shardCount < 1 || shardCount > 1000 {
 		return nil, ErrBadShardCount
@@ -61,8 +62,13 @@ func NewCounter(name string, shardCount int) (*Counter, error) {
 		shardKeys[i] = fmt.Sprintf("%s:%s", name, positionKeys[i])
 	}
 
+	if entity == "" {
+		entity = DefaultCounterEntity
+	}
+
 	return &Counter{
 		name:       name,
+		entity:     entity,
 		shardCount: shardCount,
 		shardKeys:  shardKeys,
 		shardVals:  make([]count, shardCount),
@@ -76,7 +82,7 @@ func (c *Counter) Keys(ctx context.Context) []*datastore.Key {
 	keys := make([]*datastore.Key, c.shardCount)
 
 	for i := 0; i < c.shardCount; i++ {
-		keys[i] = datastore.NewKey(ctx, CounterEntity, c.shardKeys[i], 0, nil)
+		keys[i] = datastore.NewKey(ctx, c.entity, c.shardKeys[i], 0, nil)
 	}
 
 	return keys
@@ -143,7 +149,7 @@ func (c *Counter) IncrementX(txCtx context.Context, delta int64) error {
 	val := count{}
 
 	// pick a key at random and alter its value by delta
-	key := datastore.NewKey(txCtx, CounterEntity, c.shardKeys[rand.Int63()%int64(c.shardCount)], 0, nil)
+	key := datastore.NewKey(txCtx, c.entity, c.shardKeys[rand.Int63()%int64(c.shardCount)], 0, nil)
 
 	if err := nds.Get(txCtx, key, &val); err != nil && err != datastore.ErrNoSuchEntity {
 		return err

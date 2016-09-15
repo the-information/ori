@@ -164,9 +164,6 @@ func Decode(jwt []byte, secret []byte) (*jws.ClaimSet, error) {
 	delete(claimSet.PrivateClaims, "aud")
 	delete(claimSet.PrivateClaims, "scope")
 
-	// now that we've got a valid authorization claim,
-	// get the associated object from the datastore
-
 	return claimSet, nil
 
 }
