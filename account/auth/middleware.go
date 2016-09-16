@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"fmt"
 	"github.com/guregu/kami"
 	"github.com/the-information/ori/account"
 	"github.com/the-information/ori/config"
@@ -16,6 +17,9 @@ import (
 )
 
 var (
+	ClaimSetCounterEntity = "APITokenCounter"
+	ClaimSetCounterShards = 50
+
 	ErrForbidden                 = errors.New(http.StatusForbidden, "The account does not have permission to read the specified resource")
 	ErrCannotGetAccount          = errors.New(http.StatusUnauthorized, "There was an error retrieving the account to be authenticated. Please try again.")
 	ErrCannotGetClaimSet         = errors.New(http.StatusUnauthorized, "There was an error retrieving the claim set to be authenticated. Please try again.")
@@ -38,6 +42,9 @@ func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) con
 	} else if claimSet, err := Decode([]byte(r.Header.Get("Authorization")), []byte(conf.AuthSecret)); err != nil {
 		ctx = context.WithValue(ctx, internal.ClaimSetContextKey, err)
 		return context.WithValue(ctx, internal.AuthContextKey, err)
+	} else if err = UseClaimSet(ctx, claimSet); err != nil {
+		ctx = context.WithValue(ctx, internal.ClaimSetContextKey, err)
+		return context.WithValue(ctx, internal.AuthContextKey, err)
 	} else if claimSet == SuperClaimSet {
 		ctx = context.WithValue(ctx, internal.ClaimSetContextKey, SuperClaimSet)
 		return context.WithValue(ctx, internal.AuthContextKey, &account.Super)
@@ -48,11 +55,8 @@ func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) con
 
 		var acct account.Account
 		if err := account.Get(ctx, claimSet.Sub, &acct); err != nil {
-			rest.WriteJSON(w, &rest.Response{
-				Code: http.StatusUnauthorized,
-				Body: &rest.Message{"Could not retrieve account with key " + claimSet.Sub + ": " + err.Error()},
-			})
-			return nil
+			ctx = context.WithValue(ctx, internal.ClaimSetContextKey, claimSet)
+			return context.WithValue(ctx, internal.AuthContextKey, err)
 		} else {
 			ctx = context.WithValue(ctx, internal.ClaimSetContextKey, claimSet)
 			return context.WithValue(ctx, internal.AuthContextKey, &acct)
@@ -83,10 +87,46 @@ func Super(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
 
 }
 
+// HasValidResourceToken returns an AuthCheck that grants access under the following conditions:
+//  - The claimset is valid to perform the specified operation on the current resource.
+func HasValidResourceToken(operation, paramName string) AuthCheck {
+
+	return func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+
+		var claimSet jws.ClaimSet
+
+		if err := GetClaimSet(ctx, &claimSet); err != nil {
+			log.Errorf(ctx, "Error getting claim set for authentication: %s", err.Error())
+			return ErrCannotGetClaimSet
+		}
+
+		// the syntax for a resource-specific claim is:
+		// permission:resourceId
+
+		// so, for instance, you might have
+		// readArticles:welcome-to-the-information
+
+		validScope := fmt.Sprintf("%s:%s", operation, rest.Param(ctx, paramName))
+
+		for _, scope := range strings.Split(claimSet.Scope, ",") {
+
+			if scope == validScope {
+				// token has scope for this operation and the limitation matches
+				return nil
+			}
+
+		}
+
+		// No such role available.
+		return ErrRoleNotInScope
+
+	}
+
+}
+
 // HasRole returns an AuthCheck that grants access under the following conditions:
 //	- The account specified by the token has the specified role.
-//	- The token itself has that role in scope.
-//	- The token is not used up.
+//	- The token itself has that role in scope for the requested resource.
 func HasRole(role string) AuthCheck {
 
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
@@ -107,11 +147,6 @@ func HasRole(role string) AuthCheck {
 		} else if !roleInScope(ctx, role) {
 			// the JWT claimset for this request does not have the specified role in its scope.
 			return ErrRoleNotInScope
-		} else if err = UseClaimSet(ctx, &claimSet); err == ErrClaimSetUsedUp {
-			// The claimset for this request has been all used up.
-			return err
-		} else if err != nil {
-			return errors.New(http.StatusBadRequest, err.Error())
 		} else {
 			// All ok; this request's account may access the resource.
 			return nil
@@ -194,7 +229,7 @@ func (c *Checker) Then(h kami.HandlerFunc) kami.HandlerFunc {
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 
 		var acct account.Account
-		GetAccount(ctx, &acct)
+		getAccountError := GetAccount(ctx, &acct)
 
 		// run the checks
 		var err error
@@ -210,10 +245,17 @@ func (c *Checker) Then(h kami.HandlerFunc) kami.HandlerFunc {
 
 		}
 
+		var userDisplayMessage string
+		if getAccountError == nil {
+			userDisplayMessage = acct.Email
+		} else {
+			userDisplayMessage = r.Header.Get("Authorization")
+		}
+
 		// did one of them pass?
 		if err == nil {
 
-			log.Infof(ctx, "%s: access granted", acct.Email)
+			log.Infof(ctx, "%s: %s: access granted", userDisplayMessage, r.URL.Path)
 			// mark this as a context which passed authentication
 			ctx = context.WithValue(ctx, internal.AuthCheckContextKey, "passed")
 			// run the underlying handler
@@ -221,7 +263,7 @@ func (c *Checker) Then(h kami.HandlerFunc) kami.HandlerFunc {
 
 		} else {
 
-			log.Warningf(ctx, "%s: access denied", acct.Email)
+			log.Warningf(ctx, "%s: %s: access denied", userDisplayMessage, r.URL.Path)
 			rest.WriteJSON(w, err)
 
 		}
@@ -262,10 +304,7 @@ func GetClaimSet(ctx context.Context, claimSet *jws.ClaimSet) error {
 
 }
 
-const ClaimSetCounterEntity = "APITokenCounter"
-const ClaimSetCounterShards = 50
-
-// UseClaimSet attempts to consume a claimSet. It returns an error if
+// UseClaimSet attempts to consume a claimset. It returns an error if
 // the claimset could not be consumed.
 func UseClaimSet(ctx context.Context, claimSet *jws.ClaimSet) error {
 
