@@ -40,7 +40,7 @@ func Middleware(ctx context.Context, w http.ResponseWriter, r *http.Request) con
 		w.Write([]byte(`{"message": "This API only responds with application/json in UTF-8"}`))
 		return nil
 
-	} else if r.Method != "HEAD" && r.Method != "GET" && r.Method != "OPTIONS" && !ContentIsJson(r) {
+	} else if r.Method != "HEAD" && r.Method != "GET" && r.Method != "OPTIONS" && r.Method != "DELETE" && !ContentIsJson(r) {
 
 		// If the requester has sent something other than application/json, respond with
 		// 415 Unsupported Media Type
